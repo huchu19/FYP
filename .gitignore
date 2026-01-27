@@ -1,3 +1,19 @@
+# OS junk
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node/Next.js
+node_modules/
+.next/
+
+# Local scratch
+source/
+
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
