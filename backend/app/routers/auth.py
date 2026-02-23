@@ -1,7 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.core.dependencies import get_db
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+service = AuthService()
 
 
 class LoginRequest(BaseModel):
@@ -20,6 +25,6 @@ def auth_test():
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest):
-    # Stub: accept any credentials and return a fake token
-    return TokenResponse(access_token=f"fake-token-for-{payload.email}")
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    token = service.login(db, email=payload.email, password=payload.password)
+    return TokenResponse(**token)

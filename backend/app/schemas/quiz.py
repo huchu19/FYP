@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QuizBase(BaseModel):
@@ -17,5 +17,4 @@ class QuizCreate(QuizBase):
 class Quiz(QuizBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

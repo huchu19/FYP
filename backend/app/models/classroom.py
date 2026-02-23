@@ -1,4 +1,5 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.sql import func
 
 from app.db import Base
 
@@ -11,3 +12,10 @@ class Classroom(Base):
     code = Column(String, unique=True, index=True, nullable=False)
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )

@@ -46,8 +46,7 @@ Additional features (later milestones):
 ## Getting Started (Dev)
 
 1. Clone the repo and open it in VS Code.
-2. Set up Docker or local Postgres.
+2. Set up local Postgres.
 3. Follow `/backend/README.md` for backend setup.
 4. Follow `/frontend/README.md` for frontend setup.
 5. Use the docs in `/docs` to understand the architecture and requirements.
-

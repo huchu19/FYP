@@ -1,33 +1,24 @@
-from typing import List
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, HTTPException
-
+from app.core.dependencies import get_db
+from app.services.classroom_service import ClassroomService
 from app.schemas.classroom import Classroom, ClassroomCreate
 
 router = APIRouter(prefix="/classrooms", tags=["classrooms"])
-
-# In-memory store to keep the demo self-contained
-_classrooms: List[Classroom] = []
-_seed = Classroom(id=1, name="Physics 101", code="PHYS-ABC", teacher_id=1, description="Intro mechanics and waves")
-_classrooms.append(_seed)
+service = ClassroomService()
 
 
-@router.get("/", response_model=List[Classroom])
-def list_classrooms() -> List[Classroom]:
-    return _classrooms
+@router.get("/", response_model=list[Classroom])
+def list_classrooms(db: Session = Depends(get_db)) -> list[Classroom]:
+    return service.list_classrooms(db)
 
 
 @router.post("/", response_model=Classroom, status_code=201)
-def create_classroom(payload: ClassroomCreate) -> Classroom:
-    new_id = len(_classrooms) + 1
-    classroom = Classroom(id=new_id, **payload.dict())
-    _classrooms.append(classroom)
-    return classroom
+def create_classroom(payload: ClassroomCreate, db: Session = Depends(get_db)) -> Classroom:
+    return service.create_classroom(db, payload)
 
 
 @router.get("/{classroom_id}", response_model=Classroom)
-def get_classroom(classroom_id: int) -> Classroom:
-    for classroom in _classrooms:
-        if classroom.id == classroom_id:
-            return classroom
-    raise HTTPException(status_code=404, detail="Classroom not found")
+def get_classroom(classroom_id: int, db: Session = Depends(get_db)) -> Classroom:
+    return service.get_classroom(db, classroom_id)

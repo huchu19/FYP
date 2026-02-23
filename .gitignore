@@ -48,6 +48,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!*.env.example
+!**/*.env.example
+
+# local database data directory
+backend/.pgdata/
 
 # vercel
 .vercel
