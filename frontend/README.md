@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# EduNexus Frontend – Next.js Application
 
-## Getting Started
+Teacher and student UI for the EduNexus platform.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS 4
+- PostCSS
+
+## Setup
 
 ```bash
+cd frontend
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Dev server runs at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+The frontend expects the FastAPI backend at `http://localhost:8000`. See `backend/README.md` for backend setup.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Start dev server (port 3000) |
+| `npm run build` | Production build |
+| `npm run lint` | Run ESLint |
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+frontend/
+├── app/                    # Next.js App Router
+│   ├── layout.js           # Root layout (wraps AuthProvider + Navbar)
+│   ├── page.js             # Home / landing page
+│   ├── globals.css         # Global styles (Tailwind + CSS variables)
+│   ├── (auth)/             # Auth route group
+│   │   ├── login/page.js
+│   │   └── register/page.js
+│   └── (dashboard)/        # Protected dashboard route group
+│       ├── teacher/        # Teacher pages
+│       │   ├── page.js     # Teacher dashboard
+│       │   ├── classrooms/new/page.js
+│       │   └── classrooms/[id]/lessons/new/page.js
+│       └── student/        # Student pages
+│           ├── page.js     # Student dashboard
+│           └── classrooms/[id]/page.js
+├── components/
+│   ├── auth/               # AuthProvider (React Context)
+│   ├── layout/             # Navbar
+│   ├── ui/                 # Reusable UI components
+│   └── charts/             # Analytics chart components
+├── lib/                    # Utility functions
+└── public/                 # Static assets
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Auth
 
-## Deploy on Vercel
+Authentication is managed via `components/auth/AuthProvider.js`, which wraps the app in a React Context providing the current user and JWT token. Protected routes redirect to `/login` when unauthenticated.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Styling
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Tailwind CSS 4 with CSS custom properties (e.g. `--color-surface`, `--color-text`). Responsive by default.
