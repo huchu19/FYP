@@ -54,6 +54,12 @@ yarn-error.log*
 # local database data directory
 backend/.pgdata/
 
+# SQL session files
+*.session.sql
+
+# IDE
+.vscode/
+
 # vercel
 .vercel
 

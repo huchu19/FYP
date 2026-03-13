@@ -15,6 +15,7 @@ from sqlalchemy import text
 # Allow script execution with `python scripts/seed.py`
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from app.core.security import hash_password  # noqa: E402
 from app.models.analytics_event import AnalyticsEvent  # noqa: E402
 from app.models.classroom_enrollment import ClassroomEnrollment  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
@@ -42,14 +43,14 @@ def seed() -> None:
             name="Teacher One",
             email="teacher@example.com",
             role="teacher",
-            password_hash="dev_teacher_hash",
+            password_hash=hash_password("dev_teacher_hash"),
             is_active=True,
         )
         student = User(
             name="Student One",
             email="student@example.com",
             role="student",
-            password_hash="dev_student_hash",
+            password_hash=hash_password("dev_student_hash"),
             is_active=True,
         )
         db.add_all([teacher, student])

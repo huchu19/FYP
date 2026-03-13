@@ -9,6 +9,14 @@ class QuizRepository:
     def list_all(self, db: Session) -> list[Quiz]:
         return db.query(Quiz).order_by(Quiz.id.asc()).all()
 
+    def list_for_classroom(self, db: Session, classroom_id: int) -> list[Quiz]:
+        return (
+            db.query(Quiz)
+            .filter(Quiz.classroom_id == classroom_id)
+            .order_by(Quiz.id.asc())
+            .all()
+        )
+
     def get_by_id(self, db: Session, quiz_id: int) -> Optional[Quiz]:
         return db.query(Quiz).filter(Quiz.id == quiz_id).first()
 
@@ -36,3 +44,19 @@ class QuizRepository:
         db.commit()
         db.refresh(quiz)
         return quiz
+
+    def publish(self, db: Session, quiz: Quiz) -> Quiz:
+        quiz.is_published = True
+        db.commit()
+        db.refresh(quiz)
+        return quiz
+
+    def unpublish(self, db: Session, quiz: Quiz) -> Quiz:
+        quiz.is_published = False
+        db.commit()
+        db.refresh(quiz)
+        return quiz
+
+    def delete(self, db: Session, quiz: Quiz) -> None:
+        db.delete(quiz)
+        db.commit()

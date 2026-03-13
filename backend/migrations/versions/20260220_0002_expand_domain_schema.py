@@ -135,15 +135,26 @@ def upgrade() -> None:
         "gamification",
         "badges",
         existing_type=sa.String(),
+        existing_server_default=None,
+        server_default=None,
+    )
+    op.alter_column(
+        "gamification",
+        "badges",
+        existing_type=sa.String(),
         type_=postgresql.JSONB(astext_type=sa.Text()),
         nullable=False,
-        server_default=sa.text("'[]'::jsonb"),
         postgresql_using=(
             "CASE "
             "WHEN badges IS NULL OR btrim(badges) = '' THEN '[]'::jsonb "
             "ELSE to_jsonb(string_to_array(badges, ',')) "
             "END"
         ),
+    )
+    op.alter_column(
+        "gamification",
+        "badges",
+        server_default=sa.text("'[]'::jsonb"),
     )
     op.create_foreign_key(
         "fk_gamification_classroom_id_classrooms",

@@ -6,15 +6,21 @@ from pydantic import BaseModel, ConfigDict, Field
 class ClassroomBase(BaseModel):
     name: str = Field(..., example="Physics 101")
     code: str = Field(..., example="PHYS-ABC")
-    teacher_id: int
     description: Optional[str] = Field(default=None, example="Intro to mechanics and waves")
 
 
 class ClassroomCreate(ClassroomBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
+
+
+class ClassroomJoin(BaseModel):
+    code: str
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class Classroom(ClassroomBase):
     id: int
+    teacher_id: int
 
     model_config = ConfigDict(from_attributes=True)

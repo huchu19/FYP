@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 from app.services.gamification import GamificationService
 from app.schemas.gamification import GamificationSummary
 
@@ -22,8 +24,8 @@ def leaderboard(
 
 @router.get("/me", response_model=GamificationSummary)
 def my_stats(
-    user_id: int = Query(..., ge=1),
     classroom_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> GamificationSummary:
-    return service.user_summary(db, user_id=user_id, classroom_id=classroom_id)
+    return service.user_summary(db, user_id=current_user.id, classroom_id=classroom_id)

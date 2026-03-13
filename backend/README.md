@@ -233,3 +233,12 @@ The API is now DB-backed via:
 - Models: `backend/app/models`
 
 No in-memory classroom/lesson/quiz stores are used anymore.
+
+## 10. API Documentation
+
+FastAPI auto-generates interactive API docs. When the backend is running:
+
+- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+These reflect the current state of all registered routes, request/response schemas, and auth requirements.
