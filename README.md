@@ -15,6 +15,18 @@ It is an AI-powered web platform that integrates:
 The goal is to reduce teacher workload and increase student engagement by providing a
 unified, AI-enhanced digital classroom.
 
+## AI Workflow
+
+As of March 3, 2026, this project uses Claude Code as its primary AI coding assistant.
+Codex is still part of the workflow, but mainly for debugging, verification, and focused
+second-opinion work rather than day-to-day implementation.
+
+Repository-level agent guidance:
+
+- `CLAUDE.md` for Claude Code project instructions
+- `AGENTS.md` for Codex-specific fallback behavior
+- `ai-context.md` for a short stack and architecture summary
+
 ## High-Level Architecture
 
 - Backend: FastAPI (Python)
