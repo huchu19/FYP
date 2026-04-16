@@ -5,8 +5,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiPost } from "@/lib/api";
-
-const inputClass = "w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 transition focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30";
+import {
+  alertError,
+  btnPrimary,
+  card,
+  inputClass,
+  pageSection,
+} from "@/lib/styles";
+import { ArrowRightIcon, BookIcon, PlusIcon } from "@/components/layout/icons";
 
 export default function NewClassroomPage() {
   const router = useRouter();
@@ -31,43 +37,98 @@ export default function NewClassroomPage() {
   }
 
   return (
-    <section className="space-y-6 py-10">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-        <Link className="transition hover:text-cyan-400" href="/teacher">&larr; Teacher dashboard</Link>
-        <Link className="transition hover:text-cyan-400" href="/">Home</Link>
-      </div>
+    <section className={pageSection}>
+      <header className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div>
+          <p className="text-[0.74rem] font-semibold uppercase tracking-[0.24em] text-[var(--color-primary)]">
+            Classroom Setup
+          </p>
+          <h1 className="mt-4 font-display text-[clamp(3rem,5vw,4.8rem)] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+            Create Classroom
+          </h1>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-[var(--text-muted)]">
+            Set up a new space for your students, assign a clean join code, and prepare the room for lesson generation.
+          </p>
+        </div>
 
-      <header className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">Classrooms</p>
-        <h1 className="text-3xl font-bold text-white">Create Classroom</h1>
-        <p className="text-slate-400">Set up a new classroom for your students.</p>
+        <div className={`${card} p-6`}>
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+            Next step
+          </p>
+          <p className="mt-4 font-display text-[2.1rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+            Generate your first lesson once the room is live.
+          </p>
+          <Link href="/teacher" className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]">
+            Back to dashboard
+            <ArrowRightIcon className="h-4 w-4" />
+          </Link>
+        </div>
       </header>
 
-      <div className="max-w-2xl rounded-xl border border-slate-700/50 bg-slate-900/80 p-6 backdrop-blur-md">
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-400">Classroom name</span>
-            <input type="text" className={inputClass} placeholder="Physics 101" value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-400">Code</span>
-            <input type="text" className={`${inputClass} font-mono uppercase`} placeholder="PHYS-101" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required />
-          </label>
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-400">Description</span>
-            <textarea rows={4} className={inputClass} placeholder="Intro to mechanics and waves" value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-          {error && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
-          )}
-          <button
-            type="submit"
-            className="rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40 disabled:opacity-60 disabled:shadow-none"
-            disabled={submitting}
-          >
-            {submitting ? "Creating..." : "Create classroom"}
-          </button>
-        </form>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className={`${card} p-7`}>
+          <form className="space-y-5" onSubmit={handleSubmit}>
+            <label className="block space-y-2">
+              <span className="text-base font-medium text-[var(--text-heading)]">Classroom name</span>
+              <input type="text" className={inputClass} placeholder="AP Biology — Period 3" value={name} onChange={(e) => setName(e.target.value)} required />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-base font-medium text-[var(--text-heading)]">Join code</span>
+              <input
+                type="text"
+                className={`${inputClass} font-mono uppercase tracking-[0.12em]`}
+                placeholder="BIO-203"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                required
+              />
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-base font-medium text-[var(--text-heading)]">Description</span>
+              <textarea
+                rows={5}
+                className={inputClass}
+                placeholder="Outline the subject, year group, and any teaching context that should travel with the classroom."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+
+            {error && <p className={alertError}>{error}</p>}
+
+            <button type="submit" className={btnPrimary} disabled={submitting}>
+              <PlusIcon className="h-4 w-4" />
+              {submitting ? "Creating..." : "Create Classroom"}
+            </button>
+          </form>
+        </div>
+
+        <aside className="space-y-4">
+          <div className={`${card} p-6`}>
+            <div className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] bg-[var(--color-primary-soft)] text-[var(--color-primary)]">
+              <BookIcon className="h-5 w-5" />
+            </div>
+            <p className="mt-5 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              Build the teaching container first.
+            </p>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+              Lessons, quizzes, knowledge graphs, and student progress all hang off the classroom record you create here.
+            </p>
+          </div>
+
+          <div className={`${card} p-6`}>
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+              Recommended
+            </p>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
+              <li>Use a short memorable join code.</li>
+              <li>Add subject and year group context in the description.</li>
+              <li>Open the room immediately after creation to start the AI lesson flow.</li>
+            </ul>
+          </div>
+        </aside>
       </div>
     </section>
   );

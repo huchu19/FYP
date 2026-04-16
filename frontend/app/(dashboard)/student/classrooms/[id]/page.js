@@ -4,8 +4,11 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { apiGet } from "@/lib/api";
-
-const card = "rounded-xl border border-slate-700/50 bg-slate-900/80 p-5 backdrop-blur-md";
+import {
+  card, breadcrumb, breadcrumbLink, pageSection, pageHeader,
+  headerTagViolet, pageTitle, pageSubtitle, listItem, badgeCyan, badgeSuccess,
+  loadingText,
+} from "@/lib/styles";
 
 export default function StudentClassroomPage({ params: paramsPromise }) {
   const params = use(paramsPromise);
@@ -31,38 +34,41 @@ export default function StudentClassroomPage({ params: paramsPromise }) {
   }, [params.id]);
 
   return (
-    <section className="space-y-6 py-10">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-        <Link className="transition hover:text-cyan-400" href="/student">&larr; Student dashboard</Link>
-        <Link className="transition hover:text-cyan-400" href="/">Home</Link>
+    <section className={pageSection}>
+      <div className={breadcrumb}>
+        <Link className={breadcrumbLink} href="/student">&larr; Student dashboard</Link>
+        <Link className={breadcrumbLink} href={`/student/classrooms/${params.id}/knowledge-graph`}>Knowledge Graph</Link>
+        <Link className={breadcrumbLink} href="/">Home</Link>
       </div>
 
-      <header className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-400">Classroom</p>
-        <h1 className="text-3xl font-bold text-white">
+      <header className={pageHeader}>
+        <p className={headerTagViolet}>Classroom</p>
+        <h1 className={pageTitle}>
           {loading ? <span className="animate-pulse">Loading...</span> : classroom?.name || `Classroom ${params.id}`}
         </h1>
-        <p className="text-slate-400">
+        <p className={pageSubtitle}>
           {classroom?.description || "Lessons, quizzes, and progress for this classroom."}
         </p>
       </header>
 
-      {loading && <p className="animate-pulse text-slate-500">Loading...</p>}
-      {!loading && error && <p className="text-red-400">{error}</p>}
+      {loading && <p className={loadingText}>Loading...</p>}
+      {!loading && error && <p className="text-[var(--color-danger)]">{error}</p>}
 
       {!loading && !error && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className={card}>
-            <h2 className="text-lg font-semibold text-white">Lessons</h2>
+            <h2 className="text-lg font-semibold text-[var(--text-heading)]">Lessons</h2>
             <div className="mt-3 space-y-2 text-sm">
               {lessons.length === 0 ? (
-                <p className="text-slate-500">No lessons yet.</p>
+                <p className="text-[var(--text-faint)]">No lessons yet.</p>
               ) : (
                 <ul className="space-y-2">
-                  {lessons.map((lesson) => (
-                    <li key={lesson.id} className="flex items-center justify-between rounded-lg bg-slate-800/50 px-3 py-2.5 transition hover:bg-slate-800">
-                      <span className="text-slate-200">{lesson.title}</span>
-                      <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-xs text-cyan-400">{lesson.status}</span>
+                  {lessons.filter((l) => l.status === "published").map((lesson) => (
+                    <li key={lesson.id}>
+                      <Link href={`/student/classrooms/${params.id}/lessons/${lesson.id}`} className={listItem}>
+                        <span className="text-[var(--text-primary)]">{lesson.title}</span>
+                        <span className={badgeCyan}>View</span>
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -71,22 +77,20 @@ export default function StudentClassroomPage({ params: paramsPromise }) {
           </div>
 
           <div className={card}>
-            <h2 className="text-lg font-semibold text-white">Quizzes</h2>
+            <h2 className="text-lg font-semibold text-[var(--text-heading)]">Quizzes</h2>
             <div className="mt-3 space-y-2 text-sm">
               {quizzes.length === 0 ? (
-                <p className="text-slate-500">No quizzes yet.</p>
+                <p className="text-[var(--text-faint)]">No quizzes yet.</p>
               ) : (
                 <ul className="space-y-2">
-                  {quizzes.map((quiz) => (
-                    <li key={quiz.id} className="flex items-center justify-between rounded-lg bg-slate-800/50 px-3 py-2.5 transition hover:bg-slate-800">
-                      <span className="text-slate-200">{quiz.title}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${
-                        quiz.is_published
-                          ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                          : "border border-cyan-500/20 bg-cyan-500/10 text-cyan-400"
-                      }`}>
-                        {quiz.is_published ? "Published" : "Draft"}
-                      </span>
+                  {quizzes.filter((q) => q.is_published).map((quiz) => (
+                    <li key={quiz.id}>
+                      <Link href={`/student/classrooms/${params.id}/quizzes/${quiz.id}`} className={listItem}>
+                        <span className="text-[var(--text-primary)]">{quiz.title}</span>
+                        <span className={badgeSuccess}>
+                          {quiz.questions?.length || 0} questions
+                        </span>
+                      </Link>
                     </li>
                   ))}
                 </ul>

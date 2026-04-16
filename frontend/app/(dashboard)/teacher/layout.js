@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import DashboardFrame from "@/components/layout/DashboardFrame";
 
 export default function TeacherLayout({ children }) {
   const router = useRouter();
@@ -21,8 +22,8 @@ export default function TeacherLayout({ children }) {
   }, [loading, router, user]);
 
   if (loading || !user || user.role !== "teacher") {
-    return <section className="py-10 text-sm text-slate-600">Checking your teacher session...</section>;
+    return <section className="p-10 text-sm text-[var(--text-faint)]">Checking your teacher session...</section>;
   }
 
-  return children;
+  return <DashboardFrame role="teacher">{children}</DashboardFrame>;
 }

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import DashboardFrame from "@/components/layout/DashboardFrame";
 
 export default function StudentLayout({ children }) {
   const router = useRouter();
@@ -21,8 +22,8 @@ export default function StudentLayout({ children }) {
   }, [loading, router, user]);
 
   if (loading || !user || user.role !== "student") {
-    return <section className="py-10 text-sm text-slate-600">Checking your student session...</section>;
+    return <section className="p-10 text-sm text-[var(--text-faint)]">Checking your student session...</section>;
   }
 
-  return children;
+  return <DashboardFrame role="student">{children}</DashboardFrame>;
 }

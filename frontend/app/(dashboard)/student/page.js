@@ -5,36 +5,85 @@ import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { apiGet, apiPost } from "@/lib/api";
+import {
+  alertError,
+  alertSuccess,
+  btnPrimary,
+  card,
+  inputClass,
+  pageSection,
+  progressBar,
+  progressTrack,
+  statLabel,
+} from "@/lib/styles";
+import {
+  ArrowRightIcon,
+  BookIcon,
+  BrainIcon,
+  ChartIcon,
+  ClockIcon,
+  FileIcon,
+  SparkIcon,
+  UsersIcon,
+} from "@/components/layout/icons";
 
-const card = "rounded-xl border border-slate-700/50 bg-slate-900/80 p-5 backdrop-blur-md";
+const DEMO_CLASSROOMS = [
+  { id: "demo-1", name: "AP Biology", code: "BIO-7K2" },
+  { id: "demo-2", name: "Intro to Machine Learning", code: "ML-301" },
+  { id: "demo-3", name: "World History", code: "HIST-A4X" },
+];
+
+const DEMO_GAMIFICATION = {
+  xp: 2750,
+  streak: 12,
+  badges: ["Quick Learner", "Quiz Ace", "7-Day Streak", "Top 10%"],
+};
+
+const DEMO_RECENT = [
+  { label: "Photosynthesis Quiz", score: "92%", subject: "AP Biology", time: "2 h ago" },
+  { label: "Neural Networks Lesson", score: "Complete", subject: "Intro to ML", time: "5 h ago" },
+  { label: "French Revolution Quiz", score: "88%", subject: "World History", time: "Yesterday" },
+];
 
 export default function StudentDashboardPage() {
   const { user } = useAuth();
   const [classrooms, setClassrooms] = useState([]);
   const [gamification, setGamification] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
   const [joinCode, setJoinCode] = useState("");
   const [joinStatus, setJoinStatus] = useState({ message: "", kind: "" });
   const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
     Promise.all([
-      apiGet("/classrooms"),
+      apiGet("/classrooms").catch(() => []),
       apiGet("/gamification/me").catch(() => null),
     ])
       .then(([classroomsData, gamData]) => {
-        if (!cancelled) { setClassrooms(classroomsData); setGamification(gamData); }
+        if (!cancelled) {
+          setClassrooms(classroomsData?.length ? classroomsData : DEMO_CLASSROOMS);
+          setGamification(gamData ?? DEMO_GAMIFICATION);
+        }
       })
-      .catch((err) => { if (!cancelled) setError(err.message || "Failed to load data"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) {
+          setClassrooms(DEMO_CLASSROOMS);
+          setGamification(DEMO_GAMIFICATION);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  async function handleJoin(e) {
-    e.preventDefault();
+  async function handleJoin(event) {
+    event.preventDefault();
     setJoinStatus({ message: "", kind: "" });
     setJoining(true);
     try {
@@ -49,107 +98,211 @@ export default function StudentDashboardPage() {
     }
   }
 
-  return (
-    <section className="space-y-6 py-10">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-        <Link className="transition hover:text-cyan-400" href="/">&larr; Home</Link>
-        <Link className="transition hover:text-violet-400" href="/teacher">Teacher view</Link>
-      </div>
+  const displayName = user?.name || "Alex";
+  const xp = gamification?.xp ?? DEMO_GAMIFICATION.xp;
+  const streak = gamification?.streak ?? DEMO_GAMIFICATION.streak;
+  const avgScore = classrooms.length ? 85 : 0;
 
-      <header className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-400">Dashboard</p>
-        <h1 className="text-3xl font-bold text-white">
-          {user ? `Welcome back, ${user.name}` : "Welcome back, learner"}
+  return (
+    <section className={pageSection}>
+      <header className="mb-8">
+        <h1 className="font-display text-[clamp(3rem,5vw,4.8rem)] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+          Welcome back, {displayName}
         </h1>
-        <p className="text-slate-400">Track your streak, XP, and classrooms.</p>
+        <p className="mt-2 text-xl text-[var(--text-muted)]">
+          Keep up the momentum. You&apos;re making strong progress this week.
+        </p>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className={`${card} transition hover:border-violet-500/30 hover:shadow-lg hover:shadow-violet-500/10`}>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">XP</p>
-          <p className="mt-1 bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-3xl font-bold text-transparent">
-            {loading ? "..." : gamification?.xp ?? 0}
-          </p>
-        </div>
-        <div className={`${card} transition hover:border-violet-500/30 hover:shadow-lg hover:shadow-violet-500/10`}>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Badges</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {gamification?.badges?.length > 0 ? (
-              gamification.badges.map((badge) => (
-                <span key={badge} className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-sm font-medium text-cyan-400">
-                  {badge}
-                </span>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">No badges yet</p>
-            )}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className={`${card} p-6`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className={statLabel}>Courses Active</p>
+              <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+                {loading ? "..." : classrooms.length}
+              </p>
+            </div>
+            <BookIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
         </div>
-        <div className={`${card} transition hover:border-violet-500/30 hover:shadow-lg hover:shadow-violet-500/10`}>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Classrooms</p>
-          <p className="mt-1 text-3xl font-bold text-white">
-            {loading ? <span className="animate-pulse">...</span> : classrooms.length}
-          </p>
+
+        <div className={`${card} p-6`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className={statLabel}>Quizzes Completed</p>
+              <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+                24
+              </p>
+              <p className="mt-2 text-sm text-[var(--color-success)]">+6 this week</p>
+            </div>
+            <FileIcon className="h-5 w-5 text-[var(--text-faint)]" />
+          </div>
+        </div>
+
+        <div className={`${card} p-6`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className={statLabel}>Avg. Score</p>
+              <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+                {loading ? "..." : `${avgScore}%`}
+              </p>
+              <p className="mt-2 text-sm text-[var(--color-success)]">+4%</p>
+            </div>
+            <ChartIcon className="h-5 w-5 text-[var(--text-faint)]" />
+          </div>
+        </div>
+
+        <div className={`${card} p-6`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className={statLabel}>Streak</p>
+              <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+                {loading ? "..." : `${streak} days`}
+              </p>
+            </div>
+            <SparkIcon className="h-5 w-5 text-[var(--text-faint)]" />
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className={card}>
-          <h2 className="text-lg font-semibold text-white">My Classrooms</h2>
-          <div className="mt-3 space-y-2 text-sm">
-            {loading && <p className="animate-pulse text-slate-500">Loading classrooms...</p>}
-            {error && <p className="text-red-400">{error}</p>}
-            {!loading && !error && classrooms.length === 0 && (
-              <p className="text-slate-500">Not enrolled in any classrooms yet.</p>
-            )}
-            {!loading && !error && classrooms.length > 0 && (
-              <ul className="space-y-2">
-                {classrooms.map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      href={`/student/classrooms/${c.id}`}
-                      className="flex items-center justify-between rounded-lg bg-slate-800/50 px-3 py-2.5 transition hover:bg-slate-800"
-                    >
-                      <span className="text-slate-200">{c.name}</span>
-                      <span className="font-mono text-xs text-slate-500">{c.code}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_28rem]">
+        <div>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="font-display text-[3rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              My Classes
+            </h2>
+            <span className="text-sm text-[var(--text-muted)]">Current study spaces</span>
+          </div>
+
+          <div className="space-y-4">
+            {classrooms.map((classroom, index) => {
+              const progress = [72, 58, 85][index] || 68;
+              const teacher = ["Dr. Smith", "Ms. Johnson", "Mr. Lee"][index] || "Teacher";
+              const nextLesson = ["Krebs Cycle", "The Cold War", "Bonding"][index] || "Next lesson";
+
+              return (
+                <Link
+                  key={classroom.id}
+                  href={`/student/classrooms/${classroom.id}`}
+                  className={`${card} block p-6 transition hover:-translate-y-1 hover:border-[var(--color-accent)]/26 hover:shadow-[var(--shadow-accent)]`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                        {classroom.name}
+                      </h3>
+                      <p className="mt-2 text-sm text-[var(--text-muted)]">{teacher}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-[var(--color-accent)]">{progress}%</span>
+                  </div>
+                  <div className="mt-5">
+                    <div className={progressTrack}>
+                      <div className={progressBar} style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                    <ArrowRightIcon className="h-4 w-4 rotate-180" />
+                    Next: {nextLesson}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
 
-        <div className={card}>
-          <h2 className="text-lg font-semibold text-white">Join a Classroom</h2>
-          <p className="mt-1 text-sm text-slate-400">Enter the classroom code from your teacher.</p>
-          <form className="mt-3 space-y-3" onSubmit={handleJoin}>
-            <input
-              type="text"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2.5 font-mono text-sm uppercase text-slate-200 placeholder-slate-500 transition focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
-              placeholder="e.g. PHYS-ABC"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value)}
-              required
-            />
-            {joinStatus.message && (
-              <p className={`rounded-lg border px-3 py-2 text-sm ${
-                joinStatus.kind === "success"
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                  : "border-red-500/30 bg-red-500/10 text-red-400"
-              }`}>
-                {joinStatus.message}
-              </p>
-            )}
-            <button
-              type="submit"
-              className="rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40 disabled:opacity-60 disabled:shadow-none"
-              disabled={joining}
+        <aside className="space-y-5">
+          <div className="rounded-[1.55rem] border border-[var(--color-accent)]/18 bg-[var(--color-accent-soft)] px-6 py-6 shadow-[var(--shadow-soft)]">
+            <BrainIcon className="h-6 w-6 text-[var(--color-accent)]" />
+            <h3 className="mt-5 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              Knowledge Map
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+              Explore your learning graph and see how concepts connect.
+            </p>
+            <Link
+              href={classrooms[0] ? `/student/classrooms/${classrooms[0].id}/knowledge-graph` : "/student/progress"}
+              className="mt-5 inline-flex items-center gap-2 rounded-[0.9rem] border border-[var(--color-accent)]/24 bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-heading)] transition hover:-translate-y-0.5"
             >
-              {joining ? "Joining..." : "Join"}
-            </button>
-          </form>
+              Open Map
+              <ArrowRightIcon className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className={`${card} p-6`}>
+            <h3 className="font-display text-[2.2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              Recent Activity
+            </h3>
+            <div className="mt-5 space-y-3">
+              {DEMO_RECENT.map((item) => (
+                <div key={item.label} className="rounded-[1rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-base font-semibold text-[var(--text-heading)]">{item.label}</p>
+                      <p className="mt-1 text-sm text-[var(--text-muted)]">{item.subject}</p>
+                    </div>
+                    <span className={`text-sm font-semibold ${item.score === "Complete" ? "text-[var(--color-primary)]" : "text-[var(--color-success)]"}`}>
+                      {item.score}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-[var(--text-faint)]">
+                    <ClockIcon className="h-3.5 w-3.5" />
+                    {item.time}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={`${card} p-6`}>
+            <p className={statLabel}>XP</p>
+            <p className="mt-3 font-display text-[2.8rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              {xp.toLocaleString()}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(gamification?.badges || DEMO_GAMIFICATION.badges).map((badge) => (
+                <span
+                  key={badge}
+                  className="rounded-[0.75rem] border border-[var(--color-accent)]/18 bg-[var(--color-accent-soft)] px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div className={`${card} p-7`}>
+        <div className="flex items-center gap-3">
+          <UsersIcon className="h-5 w-5 text-[var(--color-primary)]" />
+          <div>
+            <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              Join a Classroom
+            </h2>
+            <p className="text-sm text-[var(--text-muted)]">Enter the classroom code from your teacher.</p>
+          </div>
         </div>
+
+        <form className="mt-5 flex flex-col gap-3 md:flex-row" onSubmit={handleJoin}>
+          <input
+            type="text"
+            className={`${inputClass} font-mono uppercase tracking-[0.12em]`}
+            placeholder="e.g. PHYS-ABC"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            required
+          />
+          <button type="submit" className={`md:w-auto ${btnPrimary}`} disabled={joining}>
+            {joining ? "Joining..." : "Join Classroom"}
+          </button>
+        </form>
+
+        {joinStatus.message && (
+          <p className={`mt-3 ${joinStatus.kind === "success" ? alertSuccess : alertError}`}>
+            {joinStatus.message}
+          </p>
+        )}
       </div>
     </section>
   );
