@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+build/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# playwright
+e2e/.auth/
+test-results/
+playwright-report/
+blob-report/
