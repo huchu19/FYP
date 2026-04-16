@@ -2,31 +2,84 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { apiPost } from "@/lib/api";
+import GenerationDeck from "@/components/ui/GenerationDeck";
+import {
+  alertError,
+  alertSuccess,
+  btnPrimary,
+  btnSecondary,
+  card,
+  emptyState,
+  inputClass,
+  pageSection,
+} from "@/lib/styles";
+import {
+  ArrowRightIcon,
+  BookIcon,
+  FileIcon,
+  SparkIcon,
+} from "@/components/layout/icons";
 
-const card = "rounded-xl border border-slate-700/50 bg-slate-900/80 backdrop-blur-md";
-const inputClass = "w-full rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-500 transition focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30";
-const btnPrimary = "rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40 disabled:opacity-60 disabled:shadow-none";
-const btnSecondary = "rounded-lg border border-slate-600 px-5 py-2.5 text-sm font-semibold text-slate-300 transition hover:border-cyan-500/40 hover:text-white disabled:opacity-60";
+const FORMAT_OPTIONS = [
+  { value: "slides", label: "Slides", desc: "Slide-style sections" },
+  { value: "pdf_report", label: "PDF Report", desc: "Formal report layout" },
+  { value: "presentation", label: "Presentation", desc: "Bullet points and notes" },
+  { value: "flashcards", label: "Flashcards", desc: "Q&A study cards" },
+];
+
+const FORMAT_LABELS = Object.fromEntries(FORMAT_OPTIONS.map((f) => [f.value, f.label]));
 
 export default function NewLessonPage({ params: paramsPromise }) {
   const params = use(paramsPromise);
-  const [prompt, setPrompt] = useState("Teach Newton's three laws of motion with real-world examples and simple analogies");
-  const [audience, setAudience] = useState("Year 10 physics students");
-  const [length, setLength] = useState("30 minutes");
+  const router = useRouter();
+
+  // Mode toggle
+  const [mode, setMode] = useState("ai"); // "ai" | "manual"
+
+  // Shared fields
+  const [contentFormat, setContentFormat] = useState("slides");
   const [status, setStatus] = useState({ message: "", kind: "" });
   const [preview, setPreview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [activeTask, setActiveTask] = useState(null);
+  const [generationStartedAt, setGenerationStartedAt] = useState(null);
+
+  // AI mode fields
+  const [prompt, setPrompt] = useState("Teach Newton's three laws of motion with real-world examples and simple analogies");
+  const [audience, setAudience] = useState("Year 10 students");
+  const [length, setLength] = useState("60 minutes");
+  const [referenceText, setReferenceText] = useState("");
+  const [referenceFilename, setReferenceFilename] = useState("");
+  const [extracting, setExtracting] = useState(false);
+
+  // Manual mode fields
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualBody, setManualBody] = useState("");
 
   function buildPayload() {
-    const fullPrompt = [prompt, audience && `Audience: ${audience}`, length && `Length: ${length}`].filter(Boolean).join("\n");
-    return { classroom_id: Number(params.id), title: prompt ? prompt.slice(0, 60) : "Untitled lesson", prompt: fullPrompt, outline: [], body: null };
+    const fullPrompt = [prompt, audience && `Audience: ${audience}`, length && `Length: ${length}`]
+      .filter(Boolean)
+      .join("\n");
+
+    return {
+      classroom_id: Number(params.id),
+      title: prompt ? prompt.slice(0, 60) : "Untitled lesson",
+      prompt: fullPrompt,
+      outline: [],
+      body: null,
+      content_format: contentFormat,
+      reference_text: referenceText || null,
+    };
   }
 
   async function handleGenerate(event) {
     event.preventDefault();
     setStatus({ message: "", kind: "" });
+    setActiveTask("generate");
+    setGenerationStartedAt(Date.now());
     setSubmitting(true);
     try {
       const lesson = await apiPost("/lessons?generate=true", buildPayload());
@@ -36,11 +89,13 @@ export default function NewLessonPage({ params: paramsPromise }) {
       setStatus({ message: err.message || "Failed to generate lesson", kind: "error" });
     } finally {
       setSubmitting(false);
+      setActiveTask(null);
     }
   }
 
   async function handleSaveDraft() {
     setStatus({ message: "", kind: "" });
+    setActiveTask("draft");
     setSubmitting(true);
     try {
       const lesson = await apiPost("/lessons?generate=false", buildPayload());
@@ -50,103 +105,442 @@ export default function NewLessonPage({ params: paramsPromise }) {
       setStatus({ message: err.message || "Failed to save draft", kind: "error" });
     } finally {
       setSubmitting(false);
+      setActiveTask(null);
+    }
+  }
+
+  async function handleManualSave() {
+    if (!manualTitle.trim()) {
+      setStatus({ message: "Title is required", kind: "error" });
+      return;
+    }
+    setStatus({ message: "", kind: "" });
+    setSubmitting(true);
+    try {
+      const lesson = await apiPost("/lessons?generate=false", {
+        classroom_id: Number(params.id),
+        title: manualTitle.trim(),
+        prompt: null,
+        outline: [],
+        body: manualBody || null,
+        content_format: contentFormat,
+      });
+      setPreview(lesson);
+      setStatus({ message: "Lesson saved!", kind: "success" });
+    } catch (err) {
+      setStatus({ message: err.message || "Failed to save lesson", kind: "error" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/lessons/extract-text`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("token") : ""}`,
+        },
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to extract text");
+      const data = await res.json();
+      setReferenceText(data.extracted_text || "");
+      setReferenceFilename(data.filename || file.name);
+    } catch (err) {
+      setStatus({ message: err.message || "Failed to extract document text", kind: "error" });
+    } finally {
+      setExtracting(false);
     }
   }
 
   return (
-    <section className="space-y-6 py-10">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-400">
-        <Link className="transition hover:text-cyan-400" href={`/teacher/classrooms/${params.id}`}>&larr; Classroom</Link>
-        <Link className="transition hover:text-cyan-400" href="/teacher">Teacher dashboard</Link>
-        <Link className="transition hover:text-cyan-400" href="/">Home</Link>
-      </div>
+    <section className={pageSection}>
+      <header className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div>
+          <p className="text-[0.74rem] font-semibold uppercase tracking-[0.24em] text-[var(--color-primary)]">
+            Lesson Studio
+          </p>
+          <h1 className="mt-4 font-display text-[clamp(3rem,5vw,4.8rem)] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
+            Create a lesson for class {params.id}
+          </h1>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-[var(--text-muted)]">
+            Generate with AI from a teaching brief, or write your own lesson content directly.
+          </p>
+        </div>
 
-      <header className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">Lessons</p>
-        <h1 className="text-3xl font-bold text-white">New lesson for class {params.id}</h1>
-        <p className="text-slate-400">Describe what you want; we'll draft a lesson outline and quiz.</p>
+        <div className={`${card} p-6`}>
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+            Delivery mode
+          </p>
+          <p className="mt-4 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+            {FORMAT_LABELS[contentFormat]}
+          </p>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+            Quiz generation follows on the lesson detail page once the draft is created and reviewed.
+          </p>
+        </div>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className={`${card} p-6 lg:col-span-2`}>
-          <form className="space-y-4" onSubmit={handleGenerate}>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-400">Prompt</span>
-              <textarea rows={6} className={inputClass} placeholder="e.g. Teach Newton's laws with simple examples and a short 5-question quiz." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-400">Audience</span>
-                <input type="text" className={inputClass} placeholder="Year 10 physics" value={audience} onChange={(e) => setAudience(e.target.value)} />
-              </label>
-              <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-400">Length</span>
-                <input type="text" className={inputClass} placeholder="30 minutes" value={length} onChange={(e) => setLength(e.target.value)} />
-              </label>
+      {/* Mode Toggle */}
+      <div className="flex gap-2 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] p-1 w-fit">
+        <button
+          onClick={() => setMode("ai")}
+          className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+            mode === "ai"
+              ? "bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-sm"
+              : "text-[var(--text-muted)] hover:text-[var(--text-heading)]"
+          }`}
+          aria-label="AI Generate mode"
+        >
+          <SparkIcon className="mr-2 inline-block h-4 w-4" />
+          AI Generate
+        </button>
+        <button
+          onClick={() => setMode("manual")}
+          className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+            mode === "manual"
+              ? "bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-sm"
+              : "text-[var(--text-muted)] hover:text-[var(--text-heading)]"
+          }`}
+          aria-label="Write Manually mode"
+        >
+          <BookIcon className="mr-2 inline-block h-4 w-4" />
+          Write Manually
+        </button>
+      </div>
+
+      {submitting && activeTask === "generate" && generationStartedAt && (
+        <GenerationDeck
+          eyebrow="Lesson Pipeline"
+          title="Composing a lesson package from your brief"
+          description="The generator is shaping the teaching arc, selecting examples, and formatting the output so the classroom doesn't feel like it came from a blank template."
+          launchedAt={generationStartedAt}
+          context={[
+            { label: "Class", value: params.id },
+            { label: "Audience", value: audience || "General audience" },
+            { label: "Format", value: FORMAT_LABELS[contentFormat] || contentFormat },
+          ]}
+          stages={[
+            { label: "Brief Intake", detail: "Parsing the learning goal, audience, and pacing constraints from your prompt." },
+            { label: "Structure Pass", detail: "Locking the lesson spine, outline order, and section rhythm." },
+            { label: "Teaching Voice", detail: "Adding examples, analogies, and explanations that match the chosen level." },
+            { label: "Delivery Package", detail: "Compiling the final outline and body content into a classroom-ready lesson." },
+          ]}
+          footer="The preview will update the moment the lesson payload clears the pipeline."
+        />
+      )}
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="space-y-5">
+          {/* AI Generate Mode */}
+          {mode === "ai" && (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-[1.45rem] border border-[var(--color-primary)]/18 bg-[var(--color-primary-soft)] px-5 py-5 shadow-[var(--shadow-soft)]">
+                  <SparkIcon className="h-5 w-5 text-[var(--color-primary)]" />
+                  <p className="mt-4 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                    Generate Lesson
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                    Create a structured lesson with sections, explanations, examples, and reusable teaching flow.
+                  </p>
+                </div>
+
+                <div className="rounded-[1.45rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-5 py-5">
+                  <FileIcon className="h-5 w-5 text-[var(--text-faint)]" />
+                  <p className="mt-4 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                    Generate Quiz
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                    Available from the lesson view after the draft is saved, so quiz prompts inherit the lesson context.
+                  </p>
+                </div>
+              </div>
+
+              <div className={`${card} p-7`}>
+                <form className="space-y-5" onSubmit={handleGenerate}>
+                  <label className="block space-y-2">
+                    <span className="text-base font-medium text-[var(--text-heading)]">Topic brief</span>
+                    <textarea
+                      rows={6}
+                      className={inputClass}
+                      disabled={submitting}
+                      placeholder="e.g. Teach Newton's laws with simple examples and a short 5-question quiz."
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                    />
+                  </label>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block space-y-2">
+                      <span className="text-base font-medium text-[var(--text-heading)]">Audience</span>
+                      <input
+                        type="text"
+                        className={inputClass}
+                        disabled={submitting}
+                        placeholder="Year 10"
+                        value={audience}
+                        onChange={(e) => setAudience(e.target.value)}
+                      />
+                    </label>
+                    <label className="block space-y-2">
+                      <span className="text-base font-medium text-[var(--text-heading)]">Length</span>
+                      <input
+                        type="text"
+                        className={inputClass}
+                        disabled={submitting}
+                        placeholder="60 minutes"
+                        value={length}
+                        onChange={(e) => setLength(e.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Reference Document Upload */}
+                  <div className="space-y-2">
+                    <span className="text-base font-medium text-[var(--text-heading)]">Reference Document (optional)</span>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Upload a PDF, DOCX, or TXT file. Its content will be fed to the AI as reference material.
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        onChange={handleFileUpload}
+                        disabled={submitting || extracting}
+                        className="text-sm text-[var(--text-muted)] file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--color-primary-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-primary)] hover:file:opacity-80"
+                        aria-label="Upload reference document"
+                      />
+                      {extracting && <span className="text-xs text-[var(--text-faint)]">Extracting text...</span>}
+                    </div>
+                    {referenceFilename && (
+                      <div className="flex items-center gap-2 rounded-lg border border-[var(--color-success)]/20 bg-[var(--color-success)]/5 px-3 py-2">
+                        <span className="text-xs font-semibold text-[var(--color-success)]">{referenceFilename}</span>
+                        <span className="text-xs text-[var(--text-faint)]">
+                          ({referenceText.length.toLocaleString()} characters extracted)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setReferenceText(""); setReferenceFilename(""); }}
+                          className="ml-auto text-xs text-[var(--color-danger)] hover:underline"
+                          aria-label="Remove reference document"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Content Format */}
+                  <div className="space-y-2">
+                    <span className="text-base font-medium text-[var(--text-heading)]">Content format</span>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      {FORMAT_OPTIONS.map((format) => (
+                        <button
+                          key={format.value}
+                          type="button"
+                          disabled={submitting}
+                          onClick={() => setContentFormat(format.value)}
+                          className={`rounded-[1rem] border px-4 py-4 text-left transition ${
+                            contentFormat === format.value
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-[var(--shadow-soft)]"
+                              : "border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--color-primary)]/18"
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold">{format.label}</span>
+                          <span className="mt-1 block text-xs opacity-75">{format.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button type="submit" className={btnPrimary} disabled={submitting}>
+                      <SparkIcon className="h-4 w-4" />
+                      {submitting && activeTask === "generate" ? "Generating lesson..." : "Generate Lesson"}
+                    </button>
+                    <button type="button" className={btnSecondary} disabled={submitting} onClick={handleSaveDraft}>
+                      <BookIcon className="h-4 w-4" />
+                      {submitting && activeTask === "draft" ? "Saving draft..." : "Save Draft"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </>
+          )}
+
+          {/* Manual Authoring Mode */}
+          {mode === "manual" && (
+            <div className={`${card} p-7`}>
+              <div className="space-y-5">
+                <div className="rounded-[1.45rem] border border-[var(--color-accent)]/18 bg-[var(--color-accent-soft)] px-5 py-5">
+                  <BookIcon className="h-5 w-5 text-[var(--color-accent)]" />
+                  <p className="mt-4 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                    Write Your Own Lesson
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                    Full control over lesson content. Write in Markdown — sections, examples, and explanations as you see fit.
+                  </p>
+                </div>
+
+                <label className="block space-y-2">
+                  <span className="text-base font-medium text-[var(--text-heading)]">Lesson Title</span>
+                  <input
+                    type="text"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                    className={inputClass}
+                    placeholder="e.g. Introduction to Newton's Laws"
+                    disabled={submitting}
+                    required
+                    aria-label="Lesson title"
+                  />
+                </label>
+
+                <label className="block space-y-2">
+                  <span className="text-base font-medium text-[var(--text-heading)]">Lesson Content (Markdown)</span>
+                  <textarea
+                    rows={20}
+                    value={manualBody}
+                    onChange={(e) => setManualBody(e.target.value)}
+                    className={inputClass}
+                    placeholder={"# Section 1: First Law\n\nAn object at rest stays at rest...\n\n# Section 2: Second Law\n\nF = ma..."}
+                    disabled={submitting}
+                    aria-label="Lesson body content"
+                  />
+                </label>
+
+                <div className="space-y-2">
+                  <span className="text-base font-medium text-[var(--text-heading)]">Content format</span>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {FORMAT_OPTIONS.map((format) => (
+                      <button
+                        key={format.value}
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => setContentFormat(format.value)}
+                        className={`rounded-[1rem] border px-4 py-4 text-left transition ${
+                          contentFormat === format.value
+                            ? "border-[var(--color-primary)] bg-[var(--color-primary-soft)] text-[var(--color-primary)] shadow-[var(--shadow-soft)]"
+                            : "border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-[var(--color-primary)]/18"
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold">{format.label}</span>
+                        <span className="mt-1 block text-xs opacity-75">{format.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleManualSave}
+                    className={btnPrimary}
+                    disabled={submitting || !manualTitle.trim()}
+                    aria-label="Save lesson"
+                  >
+                    <BookIcon className="h-4 w-4" />
+                    {submitting ? "Saving..." : "Save Lesson"}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <button type="submit" className={btnPrimary} disabled={submitting}>
-                {submitting ? "Generating..." : "Generate lesson"}
-              </button>
-              <button type="button" className={btnSecondary} disabled={submitting} onClick={handleSaveDraft}>
-                Save draft
-              </button>
-            </div>
-          </form>
+          )}
         </div>
 
-        <div className={`${card} space-y-4 p-6`}>
-          <h2 className="text-lg font-semibold text-white">Preview</h2>
+        <aside className="space-y-5">
+          <div className={`${card} p-6`}>
+            <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+              Preview
+            </h2>
 
-          {status.message && (
-            <div className={`rounded-lg border px-3 py-2 text-sm ${
-              status.kind === "success"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                : "border-red-500/30 bg-red-500/10 text-red-400"
-            }`}>
-              {status.message}
-            </div>
-          )}
+            {status.message && (
+              <div className={`mt-4 ${status.kind === "success" ? alertSuccess : alertError}`}>
+                {status.message}
+              </div>
+            )}
 
-          {preview ? (
-            <div className="space-y-3 rounded-lg border border-slate-700/50 bg-slate-800/40 p-4 text-sm">
-              <p className="font-semibold text-white">{preview.title}</p>
-              <p className="text-xs text-slate-500">
-                Classroom {preview.classroom_id}
-                {preview.generated_by_ai && (
-                  <span className="ml-2 rounded border border-cyan-500/20 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-400">AI Generated</span>
+            {preview ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-[1.1rem] border border-[var(--border-card)] bg-[var(--bg-list)] p-4">
+                  <p className="font-display text-[1.7rem] font-semibold tracking-[-0.04em] text-[var(--text-heading)]">
+                    {preview.title}
+                  </p>
+                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                    Classroom {preview.classroom_id}
+                  </p>
+                </div>
+
+                {preview.outline?.length > 0 && (
+                  <div className="rounded-[1.1rem] border border-[var(--border-card)] bg-[var(--bg-card)] p-4">
+                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+                      Outline
+                    </p>
+                    <ol className="mt-3 space-y-2 text-sm leading-7 text-[var(--text-secondary)]">
+                      {preview.outline.map((item, idx) => (
+                        <li key={idx} className="flex gap-3">
+                          <span className="font-display text-[1.1rem] text-[var(--color-primary)]">{idx + 1}</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
                 )}
-              </p>
-              {preview.outline?.length > 0 && (
-                <>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Outline</p>
-                  <ol className="list-decimal space-y-1 pl-5 text-slate-300">
-                    {preview.outline.map((item, idx) => <li key={idx}>{item}</li>)}
-                  </ol>
-                </>
-              )}
-              {preview.body && (
-                <>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Content</p>
-                  <div className="max-h-64 overflow-y-auto whitespace-pre-wrap text-slate-300">{preview.body}</div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-slate-700/50 bg-slate-800/30 p-4 text-sm text-slate-500">
-              Outline and quiz preview will show here after generation.
-            </div>
-          )}
 
-          <div className="space-y-2 text-sm">
-            <p className="font-medium text-slate-300">Tips</p>
-            <ul className="list-disc space-y-1 pl-5 text-slate-500">
-              <li>Mention the learning goal and reading level.</li>
-              <li>Ask for question types (MCQ, short answer).</li>
-              <li>Keep prompts short for quick iterations.</li>
+                {preview.body && (
+                  <div className="rounded-[1.1rem] border border-[var(--border-card)] bg-[var(--bg-card)] p-4">
+                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+                      Content sample
+                    </p>
+                    <div className="mt-3 max-h-64 overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">
+                      {preview.body}
+                    </div>
+                  </div>
+                )}
+
+                <Link href={`/teacher/classrooms/${params.id}/lessons/${preview.id}`} className={`w-full ${btnPrimary}`}>
+                  View Full Lesson
+                  <ArrowRightIcon className="h-4 w-4" />
+                </Link>
+              </div>
+            ) : (
+              <div className={`mt-5 ${emptyState}`}>
+                {mode === "ai"
+                  ? "The lesson outline and preview will appear here after generation."
+                  : "Save your lesson to see a preview here."}
+              </div>
+            )}
+          </div>
+
+          <div className={`${card} p-6`}>
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+              {mode === "ai" ? "Prompt tips" : "Writing tips"}
+            </p>
+            <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-secondary)]">
+              {mode === "ai" ? (
+                <>
+                  <li>Mention the learning goal and reading level.</li>
+                  <li>Call out any quiz style or classroom constraints.</li>
+                  <li>Upload a reference document to give AI more context.</li>
+                  <li>Keep the prompt tight if you plan to iterate quickly.</li>
+                </>
+              ) : (
+                <>
+                  <li>Use Markdown headings (# Section) to structure your lesson.</li>
+                  <li>Include examples and analogies for key concepts.</li>
+                  <li>You can edit the body further on the lesson detail page.</li>
+                  <li>Generate quizzes after saving from the lesson view.</li>
+                </>
+              )}
             </ul>
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   );
