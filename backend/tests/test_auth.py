@@ -9,10 +9,18 @@ pytest.importorskip("jwt")
 pytest.importorskip("httpx")
 
 from app.core.security import create_access_token, decode_access_token, hash_password
+from app.models.analytics_event import AnalyticsEvent
 from app.models.classroom import Classroom
 from app.models.classroom_enrollment import ClassroomEnrollment
+from app.models.concept import Concept, StudentConceptMastery
+from app.models.gamification import Gamification
+from app.models.lesson import Lesson
+from app.models.quiz import Quiz
+from app.models.quiz_attempt import QuizAttempt
+from app.models.quiz_response import QuizResponse
 from app.models.user import User
 from app.routers import lessons as lessons_router
+from app.routers import quizzes as quizzes_router
 
 
 def create_user(session_factory, *, email: str, password: str, role: str, password_hash: Optional[str] = None) -> User:
@@ -316,6 +324,137 @@ def test_teacher_cannot_access_another_teachers_classroom(client, session_factor
     assert response.json()["detail"] == "Not authorized to access classroom"
 
 
+def test_teacher_can_delete_classroom_and_all_dependent_content(client, session_factory):
+    teacher = create_user(
+        session_factory,
+        email="teacher@example.com",
+        password="dev_teacher_hash",
+        role="teacher",
+    )
+    student = create_user(
+        session_factory,
+        email="student@example.com",
+        password="dev_student_hash",
+        role="student",
+    )
+    classroom = create_classroom(
+        session_factory,
+        teacher_id=teacher.id,
+        name="Biology",
+        code="BIO-1",
+    )
+    enroll_student(session_factory, classroom_id=classroom.id, student_id=student.id)
+
+    with session_factory() as session:
+        lesson = Lesson(
+            classroom_id=classroom.id,
+            title="Cells",
+            prompt="Teach cells",
+            outline=["Cell theory"],
+            body="Lesson body",
+            status="published",
+            created_by_user_id=teacher.id,
+        )
+        session.add(lesson)
+        session.flush()
+
+        lesson_quiz = Quiz(
+            classroom_id=classroom.id,
+            lesson_id=lesson.id,
+            title="Cells quiz",
+            difficulty="medium",
+            questions=[{"question": "Q1", "correct_answer": "A"}],
+            created_by_user_id=teacher.id,
+        )
+        standalone_quiz = Quiz(
+            classroom_id=classroom.id,
+            lesson_id=None,
+            title="Standalone quiz",
+            difficulty="easy",
+            questions=[{"question": "Q2", "correct_answer": "B"}],
+            created_by_user_id=teacher.id,
+        )
+        session.add_all([lesson_quiz, standalone_quiz])
+        session.flush()
+
+        attempt = QuizAttempt(
+            quiz_id=lesson_quiz.id,
+            student_id=student.id,
+            score=1,
+            max_score=1,
+        )
+        session.add(attempt)
+        session.flush()
+
+        response = QuizResponse(
+            attempt_id=attempt.id,
+            question_index=0,
+            question_payload={"question": "Q1", "correct_answer": "A"},
+            selected_answer="A",
+            is_correct=True,
+            awarded_xp=10,
+        )
+        concept = Concept(
+            classroom_id=classroom.id,
+            lesson_id=lesson.id,
+            name="Cell Structure",
+            description="Parts of the cell",
+        )
+        session.add_all([response, concept])
+        session.flush()
+
+        session.add(
+            StudentConceptMastery(
+                student_id=student.id,
+                concept_id=concept.id,
+                mastery_score=0.8,
+                attempts=1,
+            )
+        )
+        session.add(
+            Gamification(
+                user_id=student.id,
+                classroom_id=classroom.id,
+                xp=120,
+                badges=["first_quiz"],
+            )
+        )
+        session.add(
+            AnalyticsEvent(
+                user_id=teacher.id,
+                classroom_id=classroom.id,
+                event_type="lesson_created",
+                payload={"lesson_id": lesson.id},
+            )
+        )
+        session.commit()
+
+    teacher_token = login(client, email="teacher@example.com", password="dev_teacher_hash")
+    delete_response = client.delete(
+        f"/classrooms/{classroom.id}",
+        headers=auth_headers(teacher_token),
+    )
+
+    assert delete_response.status_code == 204
+
+    with session_factory() as session:
+        assert session.query(Classroom).count() == 0
+        assert session.query(ClassroomEnrollment).count() == 0
+        assert session.query(Lesson).count() == 0
+        assert session.query(Quiz).count() == 0
+        assert session.query(QuizAttempt).count() == 0
+        assert session.query(QuizResponse).count() == 0
+        assert session.query(Gamification).count() == 0
+        assert session.query(AnalyticsEvent).count() == 0
+        assert session.query(Concept).count() == 0
+        assert session.query(StudentConceptMastery).count() == 0
+
+    student_token = login(client, email="student@example.com", password="dev_student_hash")
+    list_response = client.get("/classrooms", headers=auth_headers(student_token))
+    assert list_response.status_code == 200
+    assert list_response.json() == []
+
+
 def test_legacy_password_login_rehashes_to_bcrypt(client, session_factory):
     create_user(
         session_factory,
@@ -380,3 +519,241 @@ def test_teacher_lesson_create_route_accepts_authenticated_teacher(client, sessi
     assert response.status_code == 201
     assert recorded == {"actor_user_id": teacher.id, "classroom_id": 7}
     assert response.json()["title"] == "Newton"
+
+
+def test_teacher_ai_quiz_generation_preserves_quiz_type_hints_and_concept_ids(
+    client, session_factory, monkeypatch
+):
+    teacher = create_user(
+        session_factory,
+        email="teacher@example.com",
+        password="dev_teacher_hash",
+        role="teacher",
+    )
+    classroom = create_classroom(
+        session_factory,
+        teacher_id=teacher.id,
+        name="Mathematics",
+        code="MATH-1",
+    )
+
+    with session_factory() as session:
+        lesson = Lesson(
+            classroom_id=classroom.id,
+            title="Fractions",
+            prompt="Teach fractions",
+            outline=["Equivalent fractions"],
+            body="Fractions lesson body",
+            status="published",
+            created_by_user_id=teacher.id,
+        )
+        session.add(lesson)
+        session.flush()
+        concept = Concept(
+            classroom_id=classroom.id,
+            lesson_id=lesson.id,
+            name="Equivalent Fractions",
+            description="Different representations of the same amount",
+        )
+        session.add(concept)
+        session.commit()
+        lesson_id = lesson.id
+        concept_id = concept.id
+
+    recorded = {}
+
+    def fake_generate_quiz(*, lesson_title, lesson_body, difficulty, num_questions, quiz_type, concept_names):
+        recorded.update(
+            {
+                "lesson_title": lesson_title,
+                "difficulty": difficulty,
+                "num_questions": num_questions,
+                "quiz_type": quiz_type,
+                "concept_names": concept_names,
+            }
+        )
+        return [
+            {
+                "question": "Which pair shows equivalent fractions?",
+                "type": "explain_reasoning",
+                "options": ["1/2 and 2/5", "1/2 and 2/4", "1/3 and 2/5", "2/3 and 3/5"],
+                "correct_answer": "1/2 and 2/4",
+                "explanation": "Multiplying numerator and denominator by the same value preserves equivalence.",
+                "requires_reasoning": True,
+                "reasoning_prompt": "Explain how you know the fractions are equivalent.",
+                "concept_tags": ["Equivalent Fractions"],
+                "hints": [
+                    "Look for fractions that represent the same amount.",
+                    "Try simplifying each option pair before comparing them.",
+                    "Multiply or divide numerator and denominator by the same number.",
+                ],
+            }
+        ]
+
+    monkeypatch.setattr(quizzes_router.service.ai_service, "generate_quiz", fake_generate_quiz)
+
+    token = login(client, email="teacher@example.com", password="dev_teacher_hash")
+    response = client.post(
+        "/quizzes?generate=true",
+        json={
+            "classroom_id": classroom.id,
+            "lesson_id": lesson_id,
+            "title": "Ignored by AI",
+            "difficulty": "medium",
+            "quiz_type": "metacognitive",
+            "questions": [],
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["quiz_type"] == "metacognitive"
+    assert recorded == {
+        "lesson_title": "Fractions",
+        "difficulty": "medium",
+        "num_questions": 5,
+        "quiz_type": "metacognitive",
+        "concept_names": ["Equivalent Fractions"],
+    }
+    assert payload["questions"][0]["hints"] == [
+        "Look for fractions that represent the same amount.",
+        "Try simplifying each option pair before comparing them.",
+        "Multiply or divide numerator and denominator by the same number.",
+    ]
+    assert payload["questions"][0]["concept_ids"] == [concept_id]
+
+
+def test_student_hinted_attempt_uses_partial_credit_and_updates_zpd(
+    client, session_factory
+):
+    teacher = create_user(
+        session_factory,
+        email="teacher@example.com",
+        password="dev_teacher_hash",
+        role="teacher",
+    )
+    student = create_user(
+        session_factory,
+        email="student@example.com",
+        password="dev_student_hash",
+        role="student",
+    )
+    classroom = create_classroom(
+        session_factory,
+        teacher_id=teacher.id,
+        name="Science",
+        code="SCI-1",
+    )
+    enroll_student(session_factory, classroom_id=classroom.id, student_id=student.id)
+
+    with session_factory() as session:
+        concept = Concept(
+            classroom_id=classroom.id,
+            name="Photosynthesis",
+            description="How plants convert light into energy",
+        )
+        session.add(concept)
+        session.flush()
+
+        quiz = Quiz(
+            classroom_id=classroom.id,
+            title="Photosynthesis Check",
+            difficulty="medium",
+            quiz_type="standard",
+            is_published=True,
+            created_by_user_id=teacher.id,
+            questions=[
+                {
+                    "question": "What gas do plants take in during photosynthesis?",
+                    "options": ["Oxygen", "Carbon dioxide", "Nitrogen", "Hydrogen"],
+                    "correct_answer": "Carbon dioxide",
+                    "explanation": "Plants use carbon dioxide and water to make glucose.",
+                    "concept_ids": [concept.id],
+                    "hints": [
+                        "Think about the gas plants need from the air.",
+                        "It is the gas animals breathe out.",
+                        "It combines with water to form glucose in photosynthesis.",
+                    ],
+                },
+                {
+                    "question": "What is the main product plants make?",
+                    "options": ["Salt", "Glucose", "Iron", "Plastic"],
+                    "correct_answer": "Glucose",
+                    "explanation": "Photosynthesis produces glucose as stored chemical energy.",
+                    "concept_ids": [concept.id],
+                    "hints": [
+                        "Think about the food plants make.",
+                        "It is a sugar used for energy storage.",
+                        "It starts with 'glu'.",
+                    ],
+                },
+            ],
+        )
+        session.add(quiz)
+        session.commit()
+        quiz_id = quiz.id
+        concept_id = concept.id
+
+    token = login(client, email="student@example.com", password="dev_student_hash")
+    response = client.post(
+        f"/quizzes/{quiz_id}/attempts",
+        json={
+            "answers": {
+                "0": {
+                    "selected_answer": "Oxygen",
+                    "confidence_level": 2,
+                    "hints_used": 0,
+                },
+                "1": {
+                    "selected_answer": "Glucose",
+                    "confidence_level": 3,
+                    "hints_used": 2,
+                },
+            },
+            "time_taken_seconds": 42,
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["score"] == pytest.approx(0.5)
+    assert payload["max_score"] == 2
+    assert payload["xp_earned"] == 5
+    assert payload["calibration_score"] == pytest.approx(0.625)
+    assert payload["responses"][1]["hints_used"] == 2
+    assert payload["responses"][1]["awarded_xp"] == 5
+
+    with session_factory() as session:
+        responses = (
+            session.query(QuizResponse)
+            .order_by(QuizResponse.question_index)
+            .all()
+        )
+        assert [r.hints_used for r in responses] == [0, 2]
+
+        mastery = (
+            session.query(StudentConceptMastery)
+            .filter(
+                StudentConceptMastery.student_id == student.id,
+                StudentConceptMastery.concept_id == concept_id,
+            )
+            .one()
+        )
+        assert mastery.attempts == 2
+        assert mastery.mastery_score == pytest.approx(0.15)
+        assert mastery.unaided_mastery == pytest.approx(0.0)
+        assert mastery.aided_mastery == pytest.approx(0.3)
+        assert mastery.evidence[-1]["hints_used"] == 2
+        assert mastery.evidence[-1]["credit_earned"] == pytest.approx(0.5)
+
+        gamification = (
+            session.query(Gamification)
+            .filter(
+                Gamification.user_id == student.id,
+                Gamification.classroom_id == classroom.id,
+            )
+            .one()
+        )
+        assert gamification.xp == 5
