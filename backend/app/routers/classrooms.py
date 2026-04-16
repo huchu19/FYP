@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
@@ -59,7 +59,8 @@ def list_classroom_lessons(
     current_user: User = Depends(get_current_user),
 ) -> list[LessonSchema]:
     service.get_classroom(db, classroom_id, actor_user=current_user)
-    return lesson_service.list_for_classroom(db, classroom_id)
+    published_only = current_user.role == "student"
+    return lesson_service.list_for_classroom(db, classroom_id, published_only=published_only)
 
 
 @router.get("/{classroom_id}/quizzes", response_model=list[QuizSchema])
@@ -69,4 +70,15 @@ def list_classroom_quizzes(
     current_user: User = Depends(get_current_user),
 ) -> list[QuizSchema]:
     service.get_classroom(db, classroom_id, actor_user=current_user)
-    return quiz_service.list_for_classroom(db, classroom_id)
+    published_only = current_user.role == "student"
+    return quiz_service.list_for_classroom(db, classroom_id, published_only=published_only)
+
+
+@router.delete("/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_classroom(
+    classroom_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("teacher")),
+) -> Response:
+    service.delete_classroom(db, classroom_id, actor_user=current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

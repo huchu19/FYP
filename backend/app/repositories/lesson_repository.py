@@ -10,13 +10,13 @@ class LessonRepository:
     def list_all(self, db: Session) -> list[Lesson]:
         return db.query(Lesson).order_by(Lesson.id.asc()).all()
 
-    def list_for_classroom(self, db: Session, classroom_id: int) -> list[Lesson]:
-        return (
-            db.query(Lesson)
-            .filter(Lesson.classroom_id == classroom_id)
-            .order_by(Lesson.id.asc())
-            .all()
-        )
+    def list_for_classroom(
+        self, db: Session, classroom_id: int, published_only: bool = False
+    ) -> list[Lesson]:
+        q = db.query(Lesson).filter(Lesson.classroom_id == classroom_id)
+        if published_only:
+            q = q.filter(Lesson.status == "published")
+        return q.order_by(Lesson.id.asc()).all()
 
     def get_by_id(self, db: Session, lesson_id: int) -> Optional[Lesson]:
         return db.query(Lesson).filter(Lesson.id == lesson_id).first()
@@ -33,6 +33,8 @@ class LessonRepository:
         created_by_user_id: Optional[int],
         status: str = "draft",
         generated_by_ai: bool = False,
+        content_format: str = "slides",
+        flashcards: Optional[list] = None,
     ) -> Lesson:
         lesson = Lesson(
             classroom_id=classroom_id,
@@ -43,6 +45,8 @@ class LessonRepository:
             created_by_user_id=created_by_user_id,
             status=status,
             generated_by_ai=generated_by_ai,
+            content_format=content_format,
+            flashcards=flashcards,
         )
         db.add(lesson)
         db.commit()

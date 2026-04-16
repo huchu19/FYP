@@ -5,7 +5,7 @@ from app.core.dependencies import get_db
 from app.core.security import get_current_user, require_roles
 from app.models.user import User
 from app.services.quiz_service import QuizService
-from app.schemas.quiz import Quiz, QuizCreate
+from app.schemas.quiz import Quiz, QuizCreate, QuizUpdate
 
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 service = QuizService()
@@ -36,6 +36,17 @@ def get_quiz(
     current_user: User = Depends(get_current_user),
 ) -> Quiz:
     return service.get_quiz(db, quiz_id)
+
+
+@router.patch("/{quiz_id}", response_model=Quiz)
+def update_quiz(
+    quiz_id: int,
+    payload: QuizUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("teacher")),
+) -> Quiz:
+    """Update quiz content (title, difficulty, type, questions)."""
+    return service.update_quiz(db, quiz_id, payload, actor_user=current_user)
 
 
 @router.patch("/{quiz_id}/publish", response_model=Quiz)

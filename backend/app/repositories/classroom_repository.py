@@ -105,3 +105,6 @@ class ClassroomRepository:
         db.commit()
         db.refresh(classroom)
         return classroom
+
+    def delete(self, db: Session, classroom: Classroom) -> None:
+        db.delete(classroom)
