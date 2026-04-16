@@ -100,11 +100,15 @@ Run from `backend/`:
 ```
 
 Current expected head:
-- `20260220_0002`
+- `20260331_0006`
 
 Current migration files:
 - `backend/migrations/versions/20260202_0001_initial.py`
 - `backend/migrations/versions/20260220_0002_expand_domain_schema.py`
+- `backend/migrations/versions/20260315_0003_metacognition_content_formats.py`
+- `backend/migrations/versions/20260315_0004_cascade_deletes.py`
+- `backend/migrations/versions/20260324_0005_knowledge_graph.py`
+- `backend/migrations/versions/20260331_0006_student_model_evidence.py`
 
 ### 4.1 Create a new migration
 
@@ -151,23 +155,35 @@ Seeded login credentials (dev only):
 ## 6. Current Schema Overview
 
 Main tables:
-- `users`
-- `classrooms`
-- `classroom_enrollments`
-- `lessons`
-- `quizzes`
-- `quiz_attempts`
-- `quiz_responses`
-- `gamification`
-- `analytics_events`
+- `users` — role (teacher/student), auth, timestamps
+- `classrooms` — teacher-owned, join codes
+- `classroom_enrollments` — student ↔ classroom link
+- `lessons` — AI-generated content (slides/PDF/presentation/flashcards), prompt, outline, body
+- `quizzes` — standard/kahoot/metacognitive types, JSONB question payloads
+- `quiz_attempts` — score, time, difficulty snapshot, reflection, self-rated understanding
+- `quiz_responses` — per-question answer, correctness, confidence (1-5), reasoning text, reasoning steps (JSONB)
+- `gamification` — per (user, classroom): XP, badges (JSONB), streak days, last activity
+- `analytics_events` — typed event log with JSONB payloads
+- `concepts` — knowledge graph nodes, per classroom, linked to lessons
+- `concept_prerequisites` — directed prerequisite edges between concepts
+- `student_concept_mastery` — per (student, concept): mastery score (0-1), attempt count
 - `alembic_version`
 
-Domain notes:
-- `users` includes role/auth/activity/timestamps.
-- `classroom_enrollments` links students to classrooms.
-- `quiz_attempts` and `quiz_responses` support adaptive quiz tracking.
-- `gamification` is per `(classroom_id, user_id)`.
-- `analytics_events` stores typed event payloads (`jsonb`).
+### Service layer
+
+```
+routers/         → HTTP endpoints (auth, classrooms, lessons, quizzes, quiz_attempts, analytics, knowledge_graph)
+services/        → Business logic (lesson, quiz, quiz_attempt, adaptive, analytics, ai, knowledge_graph)
+repositories/    → Database queries (user, classroom, lesson, quiz, quiz_attempt, gamification)
+models/          → SQLAlchemy ORM models
+schemas/         → Pydantic request/response schemas
+```
+
+### AI providers
+
+- Primary: Google Gemini 2.5 Flash (free tier)
+- Fallback: OpenAI GPT-4o-mini
+- Used for: lesson generation, quiz generation, flashcard generation, concept graph extraction
 
 ## 7. Operational Troubleshooting
 

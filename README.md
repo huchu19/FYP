@@ -1,64 +1,64 @@
-# FYP
-Hussain Naqvi's FYP. Current name is EduNexus (WIP). 
+# EduNexus – AI-Powered Adaptive Learning Platform
 
-# EduNexus – AI-Powered Adaptive Learning and Classroom Platform
+Hussain Naqvi's Final-Year Project, Queen Mary University of London (EECS).
 
-EduNexus is my final-year project at Queen Mary University of London (School of EECS).  
-It is an AI-powered web platform that integrates:
+EduNexus is a web platform that uses AI to generate educational content, adaptively assess students, and provide transparent insight into learner understanding. Inspired by Luckin's (2017) AIAssess model, the platform implements an Open Learner Model where assessment happens continuously in the background — not through "stop and test" exams.
 
-- Intelligent content and lesson generation
-- Adaptive quizzes and assessments
-- Classroom management similar to Google Classroom
-- Gamification (XP, badges, leaderboards)
-- Learning analytics and accessibility features
+## What It Does
 
-The goal is to reduce teacher workload and increase student engagement by providing a
-unified, AI-enhanced digital classroom.
+| Area | Description |
+|------|-------------|
+| **AI Content Generation** | Teachers type a prompt; Gemini 2.5 Flash generates draft lessons (slides, PDF reports, presentations, flashcards) and quizzes (standard, Kahoot-style, metacognitive) |
+| **Adaptive Assessment** | Difficulty adjusts based on recent performance; metacognitive question types (explain-reasoning, error analysis, transfer) capture how students think |
+| **Knowledge Graph** | AI extracts concepts and prerequisites from lessons; interactive force-directed graph shows mastery per concept with blind-spot detection |
+| **Gamification** | XP awards, streak tracking, 9 badge types (including metacognition badges), classroom leaderboards |
+| **Open Learner Model** | Student progress dashboard with score trends, topic mastery, confidence calibration insights, and post-quiz reflections |
+| **Analytics** | Teacher dashboards with per-student process data (confidence, reasoning steps, time-on-task) and class-aggregate summaries |
+| **Accessibility** | Dark/light theme, i18n stubs (EN + FR), browser-native text-to-speech, semantic HTML, skip links, focus outlines |
+| **Planned Teacher Authoring Controls** | Teachers will be able to iteratively refine AI-generated lessons (add/remove/rewrite sections) and attach a classroom syllabus so future lesson generation aligns with that curriculum context |
 
-## AI Workflow
+## Architecture
 
-As of March 3, 2026, this project uses Claude Code as its primary AI coding assistant.
-Codex is still part of the workflow, but mainly for debugging, verification, and focused
-second-opinion work rather than day-to-day implementation.
-
-Repository-level agent guidance:
-
-- `CLAUDE.md` for Claude Code project instructions
-- `AGENTS.md` for Codex-specific fallback behavior
-- `ai-context.md` for a short stack and architecture summary
-
-## High-Level Architecture
-
-- Backend: FastAPI (Python)
-- Frontend: Next.js (React)
-- Database: PostgreSQL
-- AI: GPT-based language models (via OpenAI API, possibly LangChain)
-- Hosting: Vercel (frontend), Render or similar (backend)
+```
+┌─────────────┐     ┌─────────────────┐     ┌────────────┐
+│  Next.js 16  │────▶│  FastAPI (Python) │────▶│ PostgreSQL │
+│  React 19    │     │  SQLAlchemy       │     │  Alembic   │
+│  Tailwind 4  │     │  Pydantic         │     └────────────┘
+└─────────────┘     └────────┬──────────┘
+                             │
+                    ┌────────▼──────────┐
+                    │  AI Providers      │
+                    │  Gemini 2.5 Flash  │
+                    │  OpenAI (fallback) │
+                    └───────────────────┘
+```
 
 ## Monorepo Structure
 
-- `/backend` – FastAPI application (APIs, business logic, AI integration)
-- `/frontend` – Next.js application (teacher & student UI)
-- `/docs` – Project documentation (requirements, architecture, research plan, etc.)
+```
+/backend    FastAPI app (routers, services, repositories, models, migrations)
+/frontend   Next.js app (App Router, teacher & student dashboards, components)
+/docs       Project documentation (requirements, architecture, milestones, report)
+```
 
-## Core Features (MVP)
+## AI Workflow
 
-- Teacher accounts, student accounts, classroom codes
-- AI-generated lessons and quizzes from natural language prompts
-- Basic adaptive quizzes that adjust difficulty based on performance
-- Simple dashboards for teachers and students
-- Initial gamification (XP and badges)
+Claude Code is the primary AI coding assistant. Codex is used as a secondary tool for debugging and review.
 
-Additional features (later milestones):
+- `CLAUDE.md` — Claude Code project instructions
+- `AGENTS.md` — Codex-specific fallback behavior
 
-- More sophisticated adaptive learning
-- Leaderboards, richer analytics
-- Accessibility improvements and LMS integration (SCORM compatibility)
+## Testing
+
+- **Backend:** `cd backend && ../.venv/bin/pytest tests/` (auth/classroom integration tests)
+- **Frontend E2E:** `cd frontend && npm run test:e2e` (Playwright: auth, teacher flow, student flow, navigation)
+
+See [frontend/README.md](frontend/README.md) for Playwright setup and [backend/README.md](backend/README.md) for database runbook.
 
 ## Getting Started (Dev)
 
-1. Clone the repo and open it in VS Code.
-2. Set up local Postgres.
-3. Follow `/backend/README.md` for backend setup.
-4. Follow `/frontend/README.md` for frontend setup.
-5. Use the docs in `/docs` to understand the architecture and requirements.
+1. Clone the repo.
+2. Set up local PostgreSQL (see [backend/README.md](backend/README.md) for connection details).
+3. `cd backend && ../.venv/bin/alembic upgrade head` to apply migrations.
+4. `cd frontend && npm install && npm run dev` to start the frontend.
+5. See [docs/milestones.md](docs/milestones.md) for project status.

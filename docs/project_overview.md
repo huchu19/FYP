@@ -19,7 +19,10 @@ EduNexus should:
 
 - Provide a classroom structure similar to Google Classroom.
 - Allow teachers to generate lessons, visuals, and quizzes from natural language prompts.
-- Adapt quiz difficulty and lesson complexity to each student's ability.
+- Allow teachers to iteratively refine AI-generated lessons by adding, removing, and rewriting sections.
+- Allow each classroom to store a syllabus or curriculum brief that guides future lesson generation.
+- Give teachers direct authoring and editing control over concepts, lessons, and quizzes alongside AI-assisted generation.
+- Adapt quiz difficulty and lesson complexity to each student's ability using concept-graph-level adaptation.
 - Use gamification (XP, badges, leaderboards) to drive engagement.
 - Offer real-time analytics and accessibility support.
 
@@ -36,6 +39,8 @@ EduNexus should:
 2. Investigate user needs and design requirements through interviews and questionnaires.
 3. Design and develop EduNexus as a web-based platform with:
    - AI lesson generation
+   - Teacher-controlled iterative refinement of AI-generated lesson drafts
+   - Classroom syllabus-aware generation context
    - Adaptive quizzes
    - Classroom management
    - Gamification and analytics
