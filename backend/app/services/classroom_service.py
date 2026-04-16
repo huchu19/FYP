@@ -3,7 +3,13 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.analytics_event import AnalyticsEvent
+from app.models.classroom_enrollment import ClassroomEnrollment
 from app.models.classroom import Classroom
+from app.models.concept import Concept
+from app.models.gamification import Gamification
+from app.models.lesson import Lesson
+from app.models.quiz import Quiz
 from app.models.user import User
 from app.repositories.classroom_repository import ClassroomRepository
 from app.repositories.user_repository import UserRepository
@@ -86,3 +92,47 @@ class ClassroomService:
             db, classroom_id=classroom.id, student_id=actor_user.id
         )
         return classroom
+
+    def delete_classroom(self, db: Session, classroom_id: int, *, actor_user: User) -> None:
+        if actor_user.role != "teacher":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only teachers can delete classrooms",
+            )
+
+        classroom = self.classroom_repository.get_for_teacher(
+            db, classroom_id=classroom_id, teacher_id=actor_user.id
+        )
+        if classroom is None:
+            existing = self.classroom_repository.get_by_id(db, classroom_id)
+            if existing is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Classroom not found",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete classroom",
+            )
+
+        db.query(AnalyticsEvent).filter(
+            AnalyticsEvent.classroom_id == classroom_id
+        ).delete(synchronize_session=False)
+        db.query(Gamification).filter(
+            Gamification.classroom_id == classroom_id
+        ).delete(synchronize_session=False)
+        db.query(ClassroomEnrollment).filter(
+            ClassroomEnrollment.classroom_id == classroom_id
+        ).delete(synchronize_session=False)
+        db.query(Concept).filter(
+            Concept.classroom_id == classroom_id
+        ).delete(synchronize_session=False)
+        db.query(Quiz).filter(
+            Quiz.classroom_id == classroom_id
+        ).delete(synchronize_session=False)
+        db.query(Lesson).filter(
+            Lesson.classroom_id == classroom_id
+        ).delete(synchronize_session=False)
+
+        self.classroom_repository.delete(db, classroom)
+        db.commit()
