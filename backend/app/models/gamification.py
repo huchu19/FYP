@@ -12,7 +12,7 @@ class Gamification(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     classroom_id = Column(Integer, ForeignKey("classrooms.id"), nullable=False)
-    xp = Column(Integer, default=0)
+    xp = Column(Integer, nullable=False, default=0)
     badges = Column(JSONB, default=list, nullable=False)
     streak_days = Column(Integer, nullable=False, default=0)
     last_activity_at = Column(DateTime(timezone=True), nullable=True)

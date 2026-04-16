@@ -8,11 +8,19 @@ class QuizBase(BaseModel):
     classroom_id: int
     title: str = Field(..., example="Kinematics basics")
     difficulty: str = Field(default="medium", example="easy|medium|hard")
+    quiz_type: str = Field(default="standard", example="standard|kahoot|metacognitive")
     questions: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class QuizCreate(QuizBase):
     lesson_id: Optional[int] = None
+
+
+class QuizUpdate(BaseModel):
+    title: Optional[str] = None
+    difficulty: Optional[str] = None
+    quiz_type: Optional[str] = None
+    questions: Optional[List[Dict[str, Any]]] = None
 
 
 class Quiz(QuizBase):

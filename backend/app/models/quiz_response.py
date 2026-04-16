@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db import Base
@@ -10,10 +11,17 @@ class QuizResponse(Base):
     __table_args__ = (UniqueConstraint("attempt_id", "question_index", name="uq_attempt_question"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    attempt_id = Column(Integer, ForeignKey("quiz_attempts.id"), nullable=False)
+    attempt_id = Column(Integer, ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=False)
+
+    attempt = relationship("QuizAttempt", back_populates="responses")
     question_index = Column(Integer, nullable=False)
     question_payload = Column(JSONB, nullable=False, default=dict)
     selected_answer = Column(Text, nullable=True)
     is_correct = Column(Boolean, nullable=False, default=False)
     awarded_xp = Column(Integer, nullable=False, default=0)
+    hints_used = Column(Integer, nullable=False, default=0)
     answered_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Metacognition: confidence and reasoning
+    confidence_level = Column(Integer, nullable=True)  # 1-5 scale
+    reasoning_text = Column(Text, nullable=True)  # explain-your-answer
+    reasoning_steps = Column(JSONB, nullable=True)  # {time_spent_ms, answer_changes: [], ...}
