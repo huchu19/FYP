@@ -212,6 +212,10 @@ def test_teacher_can_create_classroom_without_teacher_id(client, session_factory
         "code": "PHYS-101",
         "description": "Intro physics",
         "teacher_id": teacher.id,
+        "subject": None,
+        "year_group": None,
+        "learning_objectives": None,
+        "syllabus_notes": None,
     }
 
 
@@ -265,6 +269,10 @@ def test_teacher_only_sees_owned_classrooms(client, session_factory):
             "code": "OWN-1",
             "description": None,
             "teacher_id": teacher_one.id,
+            "subject": None,
+            "year_group": None,
+            "learning_objectives": None,
+            "syllabus_notes": None,
         }
     ]
 
@@ -297,6 +305,10 @@ def test_student_only_sees_enrolled_classrooms(client, session_factory):
             "code": "ALG-1",
             "description": None,
             "teacher_id": teacher.id,
+            "subject": None,
+            "year_group": None,
+            "learning_objectives": None,
+            "syllabus_notes": None,
         }
     ]
     assert hidden.id != enrolled.id

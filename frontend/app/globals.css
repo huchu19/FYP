@@ -52,8 +52,12 @@
   --line-gradient: linear-gradient(90deg, transparent 0%, hsl(35 15% 87%) 50%, transparent 100%);
   --header-burst: radial-gradient(circle at center, hsl(191 67% 25% / 0.08), transparent 70%);
 
-  --teacher-surface: hsl(192 20% 95%);
-  --student-surface: hsl(38 25% 96%);
+  --color-teacher: #1282A2;
+  --color-teacher-soft: hsl(193 60% 92%);
+  --color-teacher-glow: hsl(193 80% 36% / 0.12);
+
+  --teacher-surface: hsl(216 28% 94%);
+  --student-surface: hsl(38 35% 93%);
 
   --shadow-soft: 0 4px 12px -2px hsl(220 25% 12% / 0.06), 0 2px 4px -1px hsl(220 25% 12% / 0.04);
   --shadow-card: 0 12px 32px -4px hsl(220 25% 12% / 0.08), 0 4px 8px -2px hsl(220 25% 12% / 0.04);
@@ -131,8 +135,12 @@
   --line-gradient: linear-gradient(90deg, transparent 0%, hsl(220 15% 18%) 50%, transparent 100%);
   --header-burst: radial-gradient(circle at center, hsl(192 55% 45% / 0.1), transparent 70%);
 
-  --teacher-surface: hsl(195 15% 10%);
-  --student-surface: hsl(38 15% 10%);
+  --color-teacher: hsl(193 60% 48%);
+  --color-teacher-soft: hsl(193 35% 15%);
+  --color-teacher-glow: hsl(193 60% 48% / 0.14);
+
+  --teacher-surface: hsl(218 22% 11%);
+  --student-surface: hsl(38 20% 11%);
 
   --shadow-soft: 0 4px 12px -2px hsl(220 20% 4% / 0.24), 0 2px 4px -1px hsl(220 20% 4% / 0.18);
   --shadow-card: 0 12px 32px -4px hsl(220 20% 4% / 0.34), 0 4px 8px -2px hsl(220 20% 4% / 0.24);
@@ -377,6 +385,24 @@ select:disabled,
   animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes cg-sheet-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes cg-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.cg-sheet-enter {
+  animation: cg-sheet-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cg-backdrop-enter {
+  animation: cg-backdrop-in 0.2s ease both;
+}
+
 .dashboard-nav-link {
   display: flex;
   align-items: center;
@@ -407,7 +433,7 @@ select:disabled,
 }
 
 .dashboard-nav-teacher.dashboard-nav-link-active {
-  border-color: rgba(21, 89, 105, 0.16);
+  border-color: var(--color-teacher-glow);
 }
 
 .dashboard-nav-student.dashboard-nav-link-active {
@@ -437,6 +463,26 @@ select:disabled,
   border-color: var(--border-strong);
   background: var(--bg-list);
   color: var(--text-heading);
+}
+
+.sidebar-group-label {
+  padding: 0.6rem 1rem 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--text-faint);
+  margin-top: 0.4rem;
+}
+
+.sidebar-nav-indented {
+  padding-left: 1.75rem;
+}
+
+.sidebar-nav-collapsed {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .generation-meter {
@@ -515,4 +561,27 @@ select:disabled,
 
 .prose-themed hr {
   border-color: var(--border-card);
+}
+
+/* ── Teacher role: remap primary → #1282A2 ─────────────────────────────── */
+[data-role="teacher"] {
+  --color-primary: #1282A2;
+  --color-primary-soft: hsl(193 60% 92%);
+  --button-fill: #1282A2;
+  --button-border: #1282A2;
+  --button-shadow: 0 0 24px -4px hsl(193 80% 36% / 0.15);
+  --button-shadow-hover: 0 0 28px -4px hsl(193 80% 36% / 0.24);
+  --shadow-primary: 0 0 24px -4px hsl(193 80% 36% / 0.15);
+  --shadow-primary-hover: 0 0 28px -4px hsl(193 80% 36% / 0.24);
+  --prose-code-text: #1282A2;
+  --prose-quote-border: hsl(193 80% 36% / 0.22);
+  --prose-quote-bg: hsl(193 80% 36% / 0.05);
+  --prose-marker: #1282A2;
+}
+
+[data-theme="dark"] [data-role="teacher"] {
+  --color-primary: hsl(193 60% 48%);
+  --color-primary-soft: hsl(193 35% 15%);
+  --button-fill: hsl(193 60% 48%);
+  --button-border: hsl(193 60% 48%);
 }

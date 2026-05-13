@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db
 from app.core.security import get_current_user, require_roles
 from app.models.user import User
-from app.schemas.quiz_attempt import QuizAttemptDetail, QuizAttemptReflection, QuizAttemptResult, QuizAttemptSubmit
+from app.schemas.quiz_attempt import ConceptDelta, QuizAttemptDetail, QuizAttemptReflection, QuizAttemptResult, QuizAttemptSubmit
 from app.services.quiz_attempt_service import QuizAttemptService
 
 router = APIRouter(prefix="/quizzes", tags=["quiz-attempts"])
@@ -31,6 +31,8 @@ def submit_quiz_attempt(
     responses = service.attempt_repo.get_responses(db, attempt.id)
     xp_earned = sum(r.awarded_xp for r in responses)
     calibration_score = getattr(attempt, "_calibration_score", None)
+    raw_deltas = getattr(attempt, "_concept_deltas", None) or []
+    concept_deltas = [ConceptDelta(**d) for d in raw_deltas] if raw_deltas else None
     return QuizAttemptDetail(
         id=attempt.id,
         quiz_id=attempt.quiz_id,
@@ -46,6 +48,7 @@ def submit_quiz_attempt(
         completed_at=attempt.completed_at,
         responses=responses,
         xp_earned=xp_earned,
+        concept_deltas=concept_deltas,
     )
 
 

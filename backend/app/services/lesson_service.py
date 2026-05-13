@@ -70,6 +70,18 @@ class LessonService:
         flashcards = None
         generated_by_ai = False
 
+        # Build curriculum context from classroom profile (if set)
+        curriculum_parts = []
+        if classroom.subject:
+            curriculum_parts.append(f"Subject: {classroom.subject}")
+        if classroom.year_group:
+            curriculum_parts.append(f"Year group / level: {classroom.year_group}")
+        if classroom.learning_objectives:
+            curriculum_parts.append(f"Learning objectives:\n{classroom.learning_objectives}")
+        if classroom.syllabus_notes:
+            curriculum_parts.append(f"Syllabus notes:\n{classroom.syllabus_notes[:2000]}")
+        curriculum_context = "\n".join(curriculum_parts) or None
+
         if use_ai and payload.prompt:
             try:
                 ai_prompt = payload.prompt
@@ -79,6 +91,7 @@ class LessonService:
                 ai_result = self.ai_service.generate_lesson(
                     ai_prompt,
                     content_format=payload.content_format,
+                    curriculum_context=curriculum_context,
                 )
                 title = ai_result["title"]
                 outline = ai_result["outline"]
@@ -137,10 +150,21 @@ class LessonService:
                 status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
             )
 
+        curriculum_parts = []
+        if classroom.subject:
+            curriculum_parts.append(f"Subject: {classroom.subject}")
+        if classroom.year_group:
+            curriculum_parts.append(f"Year group / level: {classroom.year_group}")
+        if classroom.learning_objectives:
+            curriculum_parts.append(f"Learning objectives:\n{classroom.learning_objectives}")
+        if classroom.syllabus_notes:
+            curriculum_parts.append(f"Syllabus notes:\n{classroom.syllabus_notes[:2000]}")
+        curriculum_context = "\n".join(curriculum_parts) or None
+
         prompt = lesson.prompt or lesson.title
         try:
             ai_result = self.ai_service.generate_lesson(
-                prompt, content_format=content_format
+                prompt, content_format=content_format, curriculum_context=curriculum_context
             )
         except Exception as exc:
             logger.exception("AI reformat failed")

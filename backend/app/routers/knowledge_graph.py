@@ -22,6 +22,11 @@ class ConceptUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
+
+class SelfAssessPayload(BaseModel):
+    classroom_id: int
+    confidence: int  # 1-5
+
 router = APIRouter(prefix="/knowledge-graph", tags=["knowledge-graph"])
 kg_service = KnowledgeGraphService()
 
@@ -184,6 +189,27 @@ def get_practice_targets(
     return kg_service.get_practice_targets(
         db, classroom_id, current_user.id, max_concepts=max_concepts
     )
+
+
+@router.post("/concepts/{concept_id}/self-assess")
+def self_assess_concept(
+    concept_id: int,
+    payload: SelfAssessPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("student")),
+) -> dict[str, Any]:
+    """Record a student's self-declared confidence for a specific concept."""
+    if payload.confidence < 1 or payload.confidence > 5:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="confidence must be 1–5")
+    result = kg_service.self_assess(
+        db,
+        student_id=current_user.id,
+        concept_id=concept_id,
+        confidence=payload.confidence,
+    )
+    db.commit()
+    return result
 
 
 @router.post("/practice-quiz")

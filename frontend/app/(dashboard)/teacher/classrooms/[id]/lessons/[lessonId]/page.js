@@ -318,10 +318,10 @@ export default function LessonDetailPage({ params: paramsPromise }) {
               <button
                 onClick={handleTogglePublish}
                 disabled={publishing}
-                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
+                className={`rounded-lg border px-4 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
                   lesson.status === "published"
-                    ? "border border-[var(--color-warning)]/30 text-[var(--color-warning)] hover:bg-amber-500/10"
-                    : "bg-gradient-to-r from-cyan-500 to-violet-500 text-white shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]"
+                    ? "border-[var(--color-warning)]/30 text-[var(--color-warning)] hover:bg-amber-500/10"
+                    : "border-[var(--color-primary)]/40 text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
                 }`}
               >
                 {publishing ? "..." : lesson.status === "published" ? "Unpublish" : "Publish"}
@@ -509,7 +509,7 @@ export default function LessonDetailPage({ params: paramsPromise }) {
           <button
             onClick={handleGenerateQuiz}
             disabled={generatingQuiz}
-            className="rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-2 text-sm font-semibold text-white shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)] disabled:opacity-60"
+            className="rounded-lg border border-[var(--color-primary)]/40 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:bg-[var(--color-primary-soft)] disabled:opacity-60"
           >
             {generatingQuiz ? "Generating..." : "Generate Quiz"}
           </button>

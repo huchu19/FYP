@@ -27,6 +27,7 @@ export default function TeacherDashboardPage() {
   const [classrooms, setClassrooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +47,22 @@ export default function TeacherDashboardPage() {
   }, []);
 
   const firstName = user?.name?.split(" ")[0] || "Teacher";
-  const firstClassroom = classrooms[0] || null;
+  const lastId = typeof window !== "undefined"
+    ? localStorage.getItem("edunexus_teacher_last_classroom")
+    : null;
+  const firstClassroom =
+    (lastId && classrooms.find((c) => String(c.id) === lastId)) ||
+    classrooms[0] ||
+    null;
+
+  function copyJoinCode() {
+    const code = firstClassroom?.code;
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    });
+  }
 
   return (
     <section className={pageSection}>
@@ -60,7 +76,11 @@ export default function TeacherDashboardPage() {
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className={`${card} p-6`}>
+        {/* Active Classrooms → links to first classroom or create */}
+        <Link
+          href={firstClassroom ? `/teacher/classrooms/${firstClassroom.id}` : "/teacher/classrooms/new"}
+          className={`${card} block p-6 transition hover:-translate-y-0.5 hover:border-[var(--color-primary)]/24 hover:shadow-[var(--shadow-primary)]`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={statLabel}>Active Classrooms</p>
@@ -68,27 +88,40 @@ export default function TeacherDashboardPage() {
                 {loading ? "..." : classrooms.length}
               </p>
               <p className="mt-2 text-sm text-[var(--color-success)]">
-                {classrooms.length > 0 ? "Workspace ready" : "Create your first class"}
+                {classrooms.length > 0 ? "Open workspace →" : "Create your first class →"}
               </p>
             </div>
             <UsersIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
-        </div>
+        </Link>
 
-        <div className={`${card} p-6`}>
+        {/* Lead Join Code → click to copy */}
+        <button
+          type="button"
+          onClick={copyJoinCode}
+          disabled={!firstClassroom || loading}
+          className={`${card} w-full p-6 text-left transition hover:-translate-y-0.5 hover:border-[var(--color-primary)]/24 hover:shadow-[var(--shadow-primary)] disabled:cursor-default disabled:hover:translate-y-0`}
+          title={firstClassroom ? "Click to copy join code" : "No classrooms yet"}
+        >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={statLabel}>Lead Join Code</p>
               <p className="mt-4 font-display text-[3rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
                 {loading ? "..." : firstClassroom?.code || "—"}
               </p>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">Share the current classroom access code</p>
+              <p className={`mt-2 text-sm ${codeCopied ? "text-[var(--color-success)]" : "text-[var(--text-muted)]"}`}>
+                {codeCopied ? "Copied to clipboard!" : "Click to copy code"}
+              </p>
             </div>
             <BookIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
-        </div>
+        </button>
 
-        <div className={`${card} p-6`}>
+        {/* Lesson Studio → links to AI studio */}
+        <Link
+          href={firstClassroom ? `/teacher/classrooms/${firstClassroom.id}/lessons/new` : "/teacher/classrooms/new"}
+          className={`${card} block p-6 transition hover:-translate-y-0.5 hover:border-[var(--color-primary)]/24 hover:shadow-[var(--shadow-primary)]`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={statLabel}>Lesson Studio</p>
@@ -96,25 +129,29 @@ export default function TeacherDashboardPage() {
                 {firstClassroom ? "Live" : "Standby"}
               </p>
               <p className="mt-2 text-sm text-[var(--color-success)]">
-                {firstClassroom ? "Generate and refine lesson drafts" : "Create a classroom to unlock AI lesson flow"}
+                {firstClassroom ? "Generate a lesson →" : "Create a classroom first →"}
               </p>
             </div>
             <SparkIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
-        </div>
+        </Link>
 
-        <div className={`${card} p-6`}>
+        {/* Student View → opens student preview */}
+        <Link
+          href="/student"
+          className={`${card} block p-6 transition hover:-translate-y-0.5 hover:border-[var(--color-primary)]/24 hover:shadow-[var(--shadow-primary)]`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={statLabel}>Student View</p>
               <p className="mt-4 font-display text-[2.8rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
                 Open
               </p>
-              <p className="mt-2 text-sm text-[var(--color-success)]">Review the learner experience from the student side</p>
+              <p className="mt-2 text-sm text-[var(--color-success)]">Preview student experience →</p>
             </div>
             <ChartIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
-        </div>
+        </Link>
       </div>
 
       <div className="flex flex-wrap gap-3">

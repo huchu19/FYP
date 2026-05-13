@@ -12,6 +12,10 @@ class Classroom(Base):
     code = Column(String, unique=True, index=True, nullable=False)
     teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     description = Column(Text, nullable=True)
+    subject = Column(String, nullable=True)
+    year_group = Column(String, nullable=True)
+    learning_objectives = Column(Text, nullable=True)
+    syllabus_notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

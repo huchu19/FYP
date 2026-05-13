@@ -98,8 +98,8 @@ Respond with ONLY valid JSON matching this schema:
     {
       "question": "Short, punchy question text (max 120 chars)",
       "type": "kahoot",
-      "options": ["A", "B", "C", "D"],
-      "correct_answer": "A",
+      "options": ["Short answer text", "Another answer", "Third option", "Fourth option"],
+      "correct_answer": "Short answer text",
       "explanation": "Brief explanation",
       "time_limit_seconds": 20,
       "points": 1000,
@@ -115,7 +115,8 @@ Guidelines:
 - Mix difficulty: 2 easy, 2 medium, 1 hard.
 - Time limits: easy=30s, medium=20s, hard=15s.
 - Points: easy=500, medium=1000, hard=1500.
-- Options should be short (1-4 words each).
+- Options should be short (1-4 words each). Use actual answer text, NOT letters like "A", "B", "C", "D".
+- correct_answer MUST be the exact text of one of the options (copy it verbatim).
 - concept_tags: list the 1-3 concept names that this question tests.
   If a list of known concepts is provided, use those exact names.
 - hints: provide exactly 3 progressive hints per question.
@@ -136,8 +137,8 @@ Respond with ONLY valid JSON matching this schema:
     {
       "question": "The question text",
       "type": "explain_reasoning|error_analysis|transfer|multi_step",
-      "options": ["A", "B", "C", "D"],
-      "correct_answer": "A",
+      "options": ["Full option text", "Another option", "Third choice", "Fourth choice"],
+      "correct_answer": "Full option text",
       "explanation": "Detailed explanation of the correct reasoning process",
       "requires_reasoning": true,
       "reasoning_prompt": "Explain why you chose this answer and what concepts you applied.",
@@ -206,8 +207,8 @@ Respond with ONLY valid JSON matching this schema:
     {
       "question": "The question text",
       "type": "mcq",
-      "options": ["A", "B", "C", "D"],
-      "correct_answer": "A",
+      "options": ["Full option text", "Another option", "Third choice", "Fourth choice"],
+      "correct_answer": "Full option text",
       "explanation": "Detailed explanation",
       "concept_id": 1,
       "concept_name": "Concept Name",
@@ -474,6 +475,26 @@ def _parse_json(raw: str) -> dict:
 
 class AIService:
     @staticmethod
+    def _normalize_question_answers(question: dict[str, Any]) -> None:
+        """Ensure correct_answer is the actual option text, not a letter index.
+
+        Some AI responses use "A"/"B"/"C"/"D" as correct_answer even when options
+        are full-text strings. Map the letter back to the corresponding option text
+        so backend scoring compares apples to apples.
+        """
+        options = question.get("options") or []
+        correct = (question.get("correct_answer") or "").strip()
+        if not correct or not options:
+            return
+        # Already matches one of the options verbatim — nothing to do
+        if correct in options:
+            return
+        # Map single-letter answer to the option at that index (A→0, B→1, …)
+        letter_map = {chr(65 + i): opt for i, opt in enumerate(options)}
+        if correct.upper() in letter_map:
+            question["correct_answer"] = letter_map[correct.upper()]
+
+    @staticmethod
     def _normalize_question_hints(question: dict[str, Any]) -> None:
         hints = [
             str(hint).strip()
@@ -490,13 +511,18 @@ class AIService:
         question["hints"] = hints
 
     def generate_lesson(
-        self, prompt: str, *, content_format: str = "slides"
+        self,
+        prompt: str,
+        *,
+        content_format: str = "slides",
+        curriculum_context: str | None = None,
     ) -> dict[str, Any]:
         """Generate lesson content (title, outline, body) from a teacher prompt.
 
         Args:
             prompt: The teacher's lesson topic/description.
             content_format: One of slides, pdf_report, presentation, flashcards.
+            curriculum_context: Optional curriculum profile string injected before the prompt.
         """
         format_instruction = LESSON_FORMAT_INSTRUCTIONS.get(
             content_format, LESSON_FORMAT_INSTRUCTIONS["slides"]
@@ -506,7 +532,16 @@ class AIService:
             format_instruction,
         )
 
-        result = _call_model_with_retry(system_prompt, prompt)
+        user_prompt = prompt
+        if curriculum_context:
+            user_prompt = (
+                "[CURRICULUM CONTEXT — follow these constraints for all content]\n"
+                f"{curriculum_context}\n\n"
+                "[LESSON REQUEST]\n"
+                f"{prompt}"
+            )
+
+        result = _call_model_with_retry(system_prompt, user_prompt)
 
         lesson_data: dict[str, Any] = {
             "title": result.get("title", "Untitled Lesson"),
@@ -567,6 +602,7 @@ class AIService:
         questions = result.get("questions", [])
         for question in questions:
             if isinstance(question, dict):
+                self._normalize_question_answers(question)
                 self._normalize_question_hints(question)
 
         return questions
@@ -591,12 +627,14 @@ class AIService:
         concepts_with_mastery: list[dict[str, Any]],
         *,
         num_questions: int = 5,
+        avoid_questions: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Generate an adaptive concept inventory targeting weak areas.
 
         Args:
             concepts_with_mastery: List of dicts with keys: id, name, description, mastery (0-1).
             num_questions: Total questions to generate.
+            avoid_questions: Question texts from recent quizzes to avoid repeating.
         """
         concept_descriptions = "\n".join(
             f"- concept_id={c['id']}, concept_name=\"{c['name']}\", "
@@ -608,6 +646,12 @@ class AIService:
             f"the following concept mastery levels:\n\n{concept_descriptions}\n\n"
             f"Prioritise concepts with low mastery. Adapt difficulty to each concept's mastery level."
         )
+        if avoid_questions:
+            avoid_text = "\n".join(f"- {q}" for q in avoid_questions[:20])
+            user_prompt += (
+                f"\n\nDo NOT repeat or closely paraphrase any of these recently used questions "
+                f"(generate entirely different questions testing the same concepts):\n{avoid_text}"
+            )
         result = _call_model_with_retry(CONCEPT_INVENTORY_PROMPT, user_prompt)
         questions = result.get("questions", [])
         for q in questions:

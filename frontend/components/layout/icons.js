@@ -156,3 +156,19 @@ export function LogoutIcon(props) {
     </IconBase>
   );
 }
+
+export function ChevronLeftIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="m15 18-6-6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}
+
+export function EditIcon(props) {
+  return (
+    <IconBase {...props}>
+      <path d="M14.75 4.75 19.25 9.25 8.75 19.75H4.25v-4.5L14.75 4.75Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </IconBase>
+  );
+}

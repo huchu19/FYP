@@ -1,5 +1,6 @@
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.classroom_enrollment import ClassroomEnrollment
@@ -52,7 +53,7 @@ class ClassroomRepository:
         )
 
     def get_by_code(self, db: Session, code: str) -> Optional[Classroom]:
-        return db.query(Classroom).filter(Classroom.code == code).first()
+        return db.query(Classroom).filter(func.upper(Classroom.code) == code.upper()).first()
 
     def get_enrollment(
         self,
@@ -94,13 +95,29 @@ class ClassroomRepository:
         code: str,
         teacher_id: int,
         description: Optional[str],
+        subject: Optional[str] = None,
+        year_group: Optional[str] = None,
+        learning_objectives: Optional[str] = None,
+        syllabus_notes: Optional[str] = None,
     ) -> Classroom:
         classroom = Classroom(
             name=name,
             code=code,
             teacher_id=teacher_id,
             description=description,
+            subject=subject,
+            year_group=year_group,
+            learning_objectives=learning_objectives,
+            syllabus_notes=syllabus_notes,
         )
+        db.add(classroom)
+        db.commit()
+        db.refresh(classroom)
+        return classroom
+
+    def update(self, db: Session, classroom: Classroom, *, data: dict) -> Classroom:
+        for key, value in data.items():
+            setattr(classroom, key, value)
         db.add(classroom)
         db.commit()
         db.refresh(classroom)

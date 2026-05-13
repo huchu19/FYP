@@ -2,15 +2,19 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
+// Versioned key — bumping this clears any stored preference from previous sessions
+const THEME_KEY = "edunexus_theme_v2";
+
 const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "light";
-    const stored = window.localStorage.getItem("edunexus_theme");
-    return stored === "light" || stored === "dark" ? stored : "light";
+    const stored = window.localStorage.getItem(THEME_KEY);
+    return stored === "dark" ? "dark" : "light";
   });
 
+  // ThemeProvider owns the data-theme attribute on <html> — layout.js must not set it
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
@@ -18,7 +22,7 @@ export function ThemeProvider({ children }) {
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    window.localStorage.setItem("edunexus_theme", next);
+    window.localStorage.setItem(THEME_KEY, next);
     document.documentElement.setAttribute("data-theme", next);
   }
 

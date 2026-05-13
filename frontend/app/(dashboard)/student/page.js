@@ -12,8 +12,6 @@ import {
   card,
   inputClass,
   pageSection,
-  progressBar,
-  progressTrack,
   statLabel,
 } from "@/lib/styles";
 import {
@@ -27,24 +25,6 @@ import {
   UsersIcon,
 } from "@/components/layout/icons";
 
-const DEMO_CLASSROOMS = [
-  { id: "demo-1", name: "AP Biology", code: "BIO-7K2" },
-  { id: "demo-2", name: "Intro to Machine Learning", code: "ML-301" },
-  { id: "demo-3", name: "World History", code: "HIST-A4X" },
-];
-
-const DEMO_GAMIFICATION = {
-  xp: 2750,
-  streak: 12,
-  badges: ["Quick Learner", "Quiz Ace", "7-Day Streak", "Top 10%"],
-};
-
-const DEMO_RECENT = [
-  { label: "Photosynthesis Quiz", score: "92%", subject: "AP Biology", time: "2 h ago" },
-  { label: "Neural Networks Lesson", score: "Complete", subject: "Intro to ML", time: "5 h ago" },
-  { label: "French Revolution Quiz", score: "88%", subject: "World History", time: "Yesterday" },
-];
-
 export default function StudentDashboardPage() {
   const { user } = useAuth();
   const [classrooms, setClassrooms] = useState([]);
@@ -56,30 +36,20 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-
     Promise.all([
       apiGet("/classrooms").catch(() => []),
       apiGet("/gamification/me").catch(() => null),
     ])
       .then(([classroomsData, gamData]) => {
         if (!cancelled) {
-          setClassrooms(classroomsData?.length ? classroomsData : DEMO_CLASSROOMS);
-          setGamification(gamData ?? DEMO_GAMIFICATION);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setClassrooms(DEMO_CLASSROOMS);
-          setGamification(DEMO_GAMIFICATION);
+          setClassrooms(classroomsData || []);
+          setGamification(gamData);
         }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   async function handleJoin(event) {
@@ -87,7 +57,7 @@ export default function StudentDashboardPage() {
     setJoinStatus({ message: "", kind: "" });
     setJoining(true);
     try {
-      const classroom = await apiPost("/classrooms/join", { code: joinCode });
+      const classroom = await apiPost("/classrooms/join", { code: joinCode.toUpperCase().trim() });
       setClassrooms((prev) => [...prev, classroom]);
       setJoinCode("");
       setJoinStatus({ message: `Joined ${classroom.name}!`, kind: "success" });
@@ -98,23 +68,30 @@ export default function StudentDashboardPage() {
     }
   }
 
-  const displayName = user?.name || "Alex";
-  const xp = gamification?.xp ?? DEMO_GAMIFICATION.xp;
-  const streak = gamification?.streak ?? DEMO_GAMIFICATION.streak;
-  const avgScore = classrooms.length ? 85 : 0;
+  const lastClassroomId = typeof window !== "undefined"
+    ? localStorage.getItem("edunexus_student_last_classroom")
+    : null;
+  const activeClassroom =
+    (lastClassroomId && classrooms.find((c) => String(c.id) === lastClassroomId)) ||
+    classrooms[0] ||
+    null;
+
+  const xp = gamification?.xp ?? 0;
+  const streak = gamification?.streak_days ?? gamification?.streak ?? 0;
+  const badges = gamification?.badges || [];
 
   return (
     <section className={pageSection}>
       <header className="mb-8">
         <h1 className="font-display text-[clamp(3rem,5vw,4.8rem)] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
-          Welcome back, {displayName}
+          Welcome back, {user?.name || "there"}
         </h1>
         <p className="mt-2 text-xl text-[var(--text-muted)]">
-          Keep up the momentum. You&apos;re making strong progress this week.
+          Keep up the momentum.
         </p>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div className={`${card} p-6`}>
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -122,48 +99,45 @@ export default function StudentDashboardPage() {
               <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
                 {loading ? "..." : classrooms.length}
               </p>
+              <p className="mt-2 text-sm text-[var(--text-faint)]">
+                {classrooms.length > 0 ? "Your enrolled classes" : "Join a class below"}
+              </p>
             </div>
             <BookIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
         </div>
 
-        <div className={`${card} p-6`}>
+        <Link
+          href="/student/progress"
+          className={`${card} block p-6 transition hover:-translate-y-0.5 hover:border-[var(--color-accent)]/26 hover:shadow-[var(--shadow-accent)]`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className={statLabel}>Quizzes Completed</p>
+              <p className={statLabel}>XP Earned</p>
               <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
-                24
+                {loading ? "..." : xp.toLocaleString()}
               </p>
-              <p className="mt-2 text-sm text-[var(--color-success)]">+6 this week</p>
-            </div>
-            <FileIcon className="h-5 w-5 text-[var(--text-faint)]" />
-          </div>
-        </div>
-
-        <div className={`${card} p-6`}>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className={statLabel}>Avg. Score</p>
-              <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
-                {loading ? "..." : `${avgScore}%`}
-              </p>
-              <p className="mt-2 text-sm text-[var(--color-success)]">+4%</p>
+              <p className="mt-2 text-sm text-[var(--text-faint)]">View full progress →</p>
             </div>
             <ChartIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
-        </div>
+        </Link>
 
-        <div className={`${card} p-6`}>
+        <Link
+          href="/student/progress"
+          className={`${card} block p-6 transition hover:-translate-y-0.5 hover:border-[var(--color-accent)]/26 hover:shadow-[var(--shadow-accent)]`}
+        >
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={statLabel}>Streak</p>
               <p className="mt-4 font-display text-[3.1rem] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
                 {loading ? "..." : `${streak} days`}
               </p>
+              <p className="mt-2 text-sm text-[var(--text-faint)]">View full progress →</p>
             </div>
             <SparkIcon className="h-5 w-5 text-[var(--text-faint)]" />
           </div>
-        </div>
+        </Link>
       </div>
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_28rem]">
@@ -175,40 +149,46 @@ export default function StudentDashboardPage() {
             <span className="text-sm text-[var(--text-muted)]">Current study spaces</span>
           </div>
 
-          <div className="space-y-4">
-            {classrooms.map((classroom, index) => {
-              const progress = [72, 58, 85][index] || 68;
-              const teacher = ["Dr. Smith", "Ms. Johnson", "Mr. Lee"][index] || "Teacher";
-              const nextLesson = ["Krebs Cycle", "The Cold War", "Bonding"][index] || "Next lesson";
-
-              return (
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="h-28 animate-pulse rounded-[1.45rem] bg-[var(--color-primary-soft)]" />
+              ))}
+            </div>
+          ) : classrooms.length === 0 ? (
+            <div className={`${card} p-8 text-center`}>
+              <p className="text-[var(--text-muted)]">You haven&apos;t joined any classrooms yet.</p>
+              <p className="mt-2 text-sm text-[var(--text-faint)]">Use the join form below to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {classrooms.map((classroom) => (
                 <Link
                   key={classroom.id}
                   href={`/student/classrooms/${classroom.id}`}
-                  className={`${card} block p-6 transition hover:-translate-y-1 hover:border-[var(--color-accent)]/26 hover:shadow-[var(--shadow-accent)]`}
+                  className={`${card} group block p-6 transition hover:-translate-y-1 hover:border-[var(--color-accent)]/26 hover:shadow-[var(--shadow-accent)]`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                      <h3 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)] transition group-hover:text-[var(--color-accent)]">
                         {classroom.name}
                       </h3>
-                      <p className="mt-2 text-sm text-[var(--text-muted)]">{teacher}</p>
+                      {(classroom.subject || classroom.year_group) && (
+                        <p className="mt-1 text-sm text-[var(--color-primary)]">
+                          {[classroom.subject, classroom.year_group].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                      {classroom.description && (
+                        <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-1">{classroom.description}</p>
+                      )}
                     </div>
-                    <span className="text-sm font-semibold text-[var(--color-accent)]">{progress}%</span>
+                    <ArrowRightIcon className="mt-1 h-4 w-4 shrink-0 text-[var(--text-faint)] transition group-hover:text-[var(--color-accent)]" />
                   </div>
-                  <div className="mt-5">
-                    <div className={progressTrack}>
-                      <div className={progressBar} style={{ width: `${progress}%` }} />
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                    <ArrowRightIcon className="h-4 w-4 rotate-180" />
-                    Next: {nextLesson}
-                  </div>
+                  <p className="mt-4 font-mono text-xs font-semibold text-[var(--text-faint)]">{classroom.code}</p>
                 </Link>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <aside className="space-y-5">
@@ -221,7 +201,7 @@ export default function StudentDashboardPage() {
               Explore your learning graph and see how concepts connect.
             </p>
             <Link
-              href={classrooms[0] ? `/student/classrooms/${classrooms[0].id}/knowledge-graph` : "/student/progress"}
+              href={activeClassroom ? `/student/classrooms/${activeClassroom.id}/knowledge-graph` : "/student/progress"}
               className="mt-5 inline-flex items-center gap-2 rounded-[0.9rem] border border-[var(--color-accent)]/24 bg-[var(--bg-card)] px-4 py-2.5 text-sm font-medium text-[var(--text-heading)] transition hover:-translate-y-0.5"
             >
               Open Map
@@ -230,46 +210,46 @@ export default function StudentDashboardPage() {
           </div>
 
           <div className={`${card} p-6`}>
-            <h3 className="font-display text-[2.2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
-              Recent Activity
-            </h3>
-            <div className="mt-5 space-y-3">
-              {DEMO_RECENT.map((item) => (
-                <div key={item.label} className="rounded-[1rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-base font-semibold text-[var(--text-heading)]">{item.label}</p>
-                      <p className="mt-1 text-sm text-[var(--text-muted)]">{item.subject}</p>
-                    </div>
-                    <span className={`text-sm font-semibold ${item.score === "Complete" ? "text-[var(--color-primary)]" : "text-[var(--color-success)]"}`}>
-                      {item.score}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-[var(--text-faint)]">
-                    <ClockIcon className="h-3.5 w-3.5" />
-                    {item.time}
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center gap-3">
+              <FileIcon className="h-5 w-5 text-[var(--color-primary)]" />
+              <h3 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                Progress
+              </h3>
             </div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+              View your quiz history, topic mastery, and metacognitive insights.
+            </p>
+            <Link
+              href="/student/progress"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)] hover:underline"
+            >
+              Open learner model
+              <ArrowRightIcon className="h-4 w-4" />
+            </Link>
           </div>
 
-          <div className={`${card} p-6`}>
-            <p className={statLabel}>XP</p>
-            <p className="mt-3 font-display text-[2.8rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
-              {xp.toLocaleString()}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(gamification?.badges || DEMO_GAMIFICATION.badges).map((badge) => (
-                <span
-                  key={badge}
-                  className="rounded-[0.75rem] border border-[var(--color-accent)]/18 bg-[var(--color-accent-soft)] px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]"
-                >
-                  {badge}
-                </span>
-              ))}
+          {!loading && (
+            <div className={`${card} p-6`}>
+              <p className={statLabel}>XP</p>
+              <p className="mt-3 font-display text-[2.8rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                {xp.toLocaleString()}
+              </p>
+              {badges.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {badges.map((badge) => (
+                    <span
+                      key={badge}
+                      className="rounded-[0.75rem] border border-[var(--color-accent)]/18 bg-[var(--color-accent-soft)] px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-accent)]"
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--text-faint)]">Complete quizzes to earn badges.</p>
+              )}
             </div>
-          </div>
+          )}
         </aside>
       </div>
 
@@ -292,6 +272,7 @@ export default function StudentDashboardPage() {
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)}
             required
+            aria-label="Classroom join code"
           />
           <button type="submit" className={`md:w-auto ${btnPrimary}`} disabled={joining}>
             {joining ? "Joining..." : "Join Classroom"}

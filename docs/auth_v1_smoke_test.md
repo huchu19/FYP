@@ -6,8 +6,8 @@
    `cd backend && ../.venv/bin/pip install -r requirements.txt`
 2. Verify the database is healthy:
    `cd backend && ../.venv/bin/python scripts/db_health_check.py`
-3. Reset and seed local data if needed:
-   `cd backend && ../.venv/bin/alembic upgrade head && ../.venv/bin/python scripts/seed.py`
+3. Apply any pending migrations:
+   `cd backend && ../.venv/bin/alembic upgrade head`
 4. Start the backend and frontend in separate terminals.
 
 ## Manual API Checks

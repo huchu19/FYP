@@ -55,6 +55,15 @@ class QuizAttemptResult(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ConceptDelta(BaseModel):
+    concept_id: int
+    concept_name: str
+    mastery_before: float
+    mastery_after: float
+    delta: float
+
+
 class QuizAttemptDetail(QuizAttemptResult):
     responses: List[QuizAttemptResponse] = []
     xp_earned: int = 0
+    concept_deltas: Optional[List[ConceptDelta]] = None

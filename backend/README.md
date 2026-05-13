@@ -121,36 +121,16 @@ Current migration files:
 Note:
 - `backend/migrations/script.py.mako` exists and is required for `revision --autogenerate`.
 
-## 5. Seed and Reset Data
+## 5. Reset Data
 
-### 5.1 Seed sample data
-
-```bash
-../.venv/bin/python scripts/seed.py
-```
-
-Seed script path:
-- `backend/scripts/seed.py`
-
-Seeded baseline includes:
-- 1 teacher user + 1 student user
-- 1 classroom + 1 enrollment
-- 1 lesson + 1 quiz
-- 1 quiz attempt + 2 quiz responses
-- 2 gamification rows
-- 1 analytics event
-
-Seeded login credentials (dev only):
-- `teacher@example.com` / `dev_teacher_hash`
-- `student@example.com` / `dev_student_hash`
-
-### 5.2 Reset schema + seed (clean local state)
+### 5.1 Reset schema to clean state
 
 ```bash
 ../.venv/bin/alembic downgrade base
 ../.venv/bin/alembic upgrade head
-../.venv/bin/python scripts/seed.py
 ```
+
+After reset, register accounts via the `/register` endpoint or the frontend auth flow.
 
 ## 6. Current Schema Overview
 
@@ -229,7 +209,6 @@ From `backend/`:
 ../.venv/bin/alembic current
 ../.venv/bin/alembic upgrade head
 ../.venv/bin/alembic check
-../.venv/bin/python scripts/seed.py   # optional, only if you need demo baseline data
 ```
 
 `scripts/db_health_check.py` is the full validation pass. It checks:

@@ -157,8 +157,8 @@ class QuizAttemptService:
             raw_answer = answers.get(str(idx), "")
             selected, confidence, reasoning_text, reasoning_steps, raw_hints_used = _extract_answer_detail(raw_answer)
 
-            correct_answer = question.get("correct_answer", "")
-            is_correct = selected == correct_answer
+            correct_answer = (question.get("correct_answer") or "").strip()
+            is_correct = (selected or "").strip() == correct_answer
             hints_used = _normalize_hints_used(
                 raw_hints_used,
                 len(question.get("hints") or []),
@@ -195,6 +195,21 @@ class QuizAttemptService:
                     (cid, is_correct, confidence, hints_used, credit_earned)
                 )
 
+        # Snapshot mastery before updates for the diff panel
+        unique_concept_ids = list({cid for cid, *_ in concept_mastery_updates})
+        mastery_before_map: dict[int, float] = {}
+        if unique_concept_ids:
+            from app.models.concept import Concept, StudentConceptMastery as SCM
+            pre_rows = (
+                db.query(SCM)
+                .filter(
+                    SCM.student_id == actor_user.id,
+                    SCM.concept_id.in_(unique_concept_ids),
+                )
+                .all()
+            )
+            mastery_before_map = {r.concept_id: r.mastery_score for r in pre_rows}
+
         # Update concept mastery from quiz responses
         for concept_id, is_correct, confidence, hints_used, credit_earned in concept_mastery_updates:
             try:
@@ -210,6 +225,36 @@ class QuizAttemptService:
                 )
             except Exception:
                 logger.warning("Failed to update mastery for concept %d", concept_id, exc_info=True)
+
+        # Build concept deltas (snapshot after vs before) with concept names
+        concept_deltas: list[dict] = []
+        if unique_concept_ids:
+            from app.models.concept import Concept, StudentConceptMastery as SCM
+            concept_name_map = {
+                c.id: c.name
+                for c in db.query(Concept).filter(Concept.id.in_(unique_concept_ids)).all()
+            }
+            post_rows = (
+                db.query(SCM)
+                .filter(
+                    SCM.student_id == actor_user.id,
+                    SCM.concept_id.in_(unique_concept_ids),
+                )
+                .all()
+            )
+            mastery_after_map = {r.concept_id: r.mastery_score for r in post_rows}
+            for cid in unique_concept_ids:
+                before = round(mastery_before_map.get(cid, 0.0), 3)
+                after = round(mastery_after_map.get(cid, 0.0), 3)
+                concept_deltas.append(
+                    {
+                        "concept_id": cid,
+                        "concept_name": concept_name_map.get(cid, f"Concept {cid}"),
+                        "mastery_before": before,
+                        "mastery_after": after,
+                        "delta": round(after - before, 3),
+                    }
+                )
 
         score = round(score, 2)
         perfect_attempt = max_score > 0 and score == float(max_score)
@@ -316,8 +361,9 @@ class QuizAttemptService:
         db.commit()
         db.refresh(attempt)
 
-        # Attach calibration score as a transient attribute for the response
+        # Attach transient attributes for the response
         attempt._calibration_score = calibration_score
+        attempt._concept_deltas = concept_deltas or []
         return attempt
 
     def get_attempt(self, db: Session, attempt_id: int) -> QuizAttempt:

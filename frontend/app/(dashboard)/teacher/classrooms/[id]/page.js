@@ -23,6 +23,7 @@ export default function ClassroomPage({ params: paramsPromise }) {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    localStorage.setItem("edunexus_teacher_last_classroom", params.id);
     let cancelled = false;
     Promise.all([
       apiGet(`/classrooms/${params.id}`),
@@ -63,6 +64,7 @@ export default function ClassroomPage({ params: paramsPromise }) {
         <Link className={breadcrumbLink} href={`/teacher/classrooms/${params.id}/lessons/new`}>New lesson</Link>
         <Link className={breadcrumbLink} href={`/teacher/classrooms/${params.id}/quizzes/new`}>New quiz</Link>
         <Link className={breadcrumbLink} href={`/teacher/classrooms/${params.id}/knowledge-graph`}>Knowledge Graph</Link>
+        <Link className={breadcrumbLink} href={`/teacher/classrooms/${params.id}/edit`}>Edit Curriculum</Link>
         <Link className={breadcrumbLink} href="/">Home</Link>
       </div>
 
@@ -103,6 +105,51 @@ export default function ClassroomPage({ params: paramsPromise }) {
                 <p className="mt-1 text-[var(--text-secondary)]">{classroom?.description || "No description yet."}</p>
               </div>
             </div>
+
+            {(classroom?.subject || classroom?.year_group || classroom?.learning_objectives || classroom?.syllabus_notes) && (
+              <div className="mt-6 rounded-[1rem] border border-[var(--color-primary)]/18 bg-[var(--color-primary-soft)] px-4 py-4">
+                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[var(--color-primary)]">
+                  Curriculum Profile
+                </p>
+                <dl className="mt-3 space-y-2 text-sm text-[var(--text-secondary)]">
+                  {classroom.subject && (
+                    <div><dt className="inline font-medium text-[var(--text-heading)]">Subject: </dt><dd className="inline">{classroom.subject}</dd></div>
+                  )}
+                  {classroom.year_group && (
+                    <div><dt className="inline font-medium text-[var(--text-heading)]">Level: </dt><dd className="inline">{classroom.year_group}</dd></div>
+                  )}
+                  {classroom.learning_objectives && (
+                    <div>
+                      <dt className="font-medium text-[var(--text-heading)]">Learning objectives:</dt>
+                      <dd className="mt-1 whitespace-pre-line">{classroom.learning_objectives}</dd>
+                    </div>
+                  )}
+                  {classroom.syllabus_notes && (
+                    <div>
+                      <dt className="font-medium text-[var(--text-heading)]">Syllabus notes:</dt>
+                      <dd className="mt-1 whitespace-pre-line">{classroom.syllabus_notes}</dd>
+                    </div>
+                  )}
+                </dl>
+                <Link
+                  href={`/teacher/classrooms/${params.id}/edit`}
+                  className="mt-3 inline-block text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                >
+                  Edit curriculum profile →
+                </Link>
+              </div>
+            )}
+
+            {!(classroom?.subject || classroom?.year_group || classroom?.learning_objectives || classroom?.syllabus_notes) && (
+              <div className="mt-4">
+                <Link
+                  href={`/teacher/classrooms/${params.id}/edit`}
+                  className="text-xs font-medium text-[var(--color-primary)] hover:underline"
+                >
+                  + Add curriculum profile
+                </Link>
+              </div>
+            )}
           </div>
 
           <div className={card}>

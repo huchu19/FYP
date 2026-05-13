@@ -13,7 +13,7 @@ from app.models.quiz import Quiz
 from app.models.user import User
 from app.repositories.classroom_repository import ClassroomRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.classroom import ClassroomCreate
+from app.schemas.classroom import ClassroomCreate, ClassroomUpdate
 
 
 class ClassroomService:
@@ -59,26 +59,31 @@ class ClassroomService:
         if actor_user.role != "teacher":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only teachers can create classrooms")
 
-        existing = self.classroom_repository.get_by_code(db, payload.code)
+        normalized_code = payload.code.upper().strip()
+        existing = self.classroom_repository.get_by_code(db, normalized_code)
         if existing is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Classroom code '{payload.code}' already exists",
+                detail=f"Classroom code '{normalized_code}' already exists",
             )
 
         return self.classroom_repository.create(
             db,
             name=payload.name,
-            code=payload.code,
+            code=normalized_code,
             teacher_id=actor_user.id,
             description=payload.description,
+            subject=payload.subject,
+            year_group=payload.year_group,
+            learning_objectives=payload.learning_objectives,
+            syllabus_notes=payload.syllabus_notes,
         )
 
     def enroll_student(self, db: Session, *, code: str, actor_user: User) -> Classroom:
         if actor_user.role != "student":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only students can enroll")
 
-        classroom = self.classroom_repository.get_by_code(db, code)
+        classroom = self.classroom_repository.get_by_code(db, code.upper().strip())
         if classroom is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
 
@@ -92,6 +97,21 @@ class ClassroomService:
             db, classroom_id=classroom.id, student_id=actor_user.id
         )
         return classroom
+
+    def update_classroom(
+        self, db: Session, classroom_id: int, payload: ClassroomUpdate, *, actor_user: User
+    ) -> Classroom:
+        if actor_user.role != "teacher":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only teachers can update classrooms")
+
+        classroom = self.classroom_repository.get_for_teacher(
+            db, classroom_id=classroom_id, teacher_id=actor_user.id
+        )
+        if classroom is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Classroom not found")
+
+        data = payload.model_dump(exclude_unset=True)
+        return self.classroom_repository.update(db, classroom, data=data)
 
     def delete_classroom(self, db: Session, classroom_id: int, *, actor_user: User) -> None:
         if actor_user.role != "teacher":

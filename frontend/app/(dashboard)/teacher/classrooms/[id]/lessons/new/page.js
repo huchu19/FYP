@@ -1,10 +1,12 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { apiPost } from "@/lib/api";
+import { apiGet, apiPost, getAccessToken } from "@/lib/api";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 import GenerationDeck from "@/components/ui/GenerationDeck";
 import {
   alertError,
@@ -58,6 +60,14 @@ export default function NewLessonPage({ params: paramsPromise }) {
   // Manual mode fields
   const [manualTitle, setManualTitle] = useState("");
   const [manualBody, setManualBody] = useState("");
+
+  // Classroom curriculum context
+  const [classroom, setClassroom] = useState(null);
+  useEffect(() => {
+    apiGet(`/classrooms/${params.id}`)
+      .then(setClassroom)
+      .catch(() => {});
+  }, [params.id]);
 
   function buildPayload() {
     const fullPrompt = [prompt, audience && `Audience: ${audience}`, length && `Length: ${length}`]
@@ -141,11 +151,10 @@ export default function NewLessonPage({ params: paramsPromise }) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/lessons/extract-text`, {
+      const token = getAccessToken();
+      const res = await fetch(`${API_BASE}/lessons/extract-text`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("token") : ""}`,
-        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
       if (!res.ok) throw new Error("Failed to extract text");
@@ -167,7 +176,7 @@ export default function NewLessonPage({ params: paramsPromise }) {
             Lesson Studio
           </p>
           <h1 className="mt-4 font-display text-[clamp(3rem,5vw,4.8rem)] font-semibold tracking-[-0.06em] text-[var(--text-heading)]">
-            Create a lesson for class {params.id}
+            Create a lesson for {classroom?.name || `class ${params.id}`}
           </h1>
           <p className="mt-4 max-w-3xl text-lg leading-8 text-[var(--text-muted)]">
             Generate with AI from a teaching brief, or write your own lesson content directly.
@@ -265,6 +274,34 @@ export default function NewLessonPage({ params: paramsPromise }) {
 
               <div className={`${card} p-7`}>
                 <form className="space-y-5" onSubmit={handleGenerate}>
+                  {classroom && (classroom.subject || classroom.year_group || classroom.learning_objectives) && (
+                    <div className="rounded-[1.1rem] border border-[var(--color-primary)]/18 bg-[var(--color-primary-soft)] px-4 py-4">
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-[var(--color-primary)]">
+                        Curriculum context — active for this classroom
+                      </p>
+                      <dl className="mt-3 space-y-1 text-sm text-[var(--text-secondary)]">
+                        {classroom.subject && (
+                          <div><dt className="inline font-medium text-[var(--text-heading)]">Subject: </dt><dd className="inline">{classroom.subject}</dd></div>
+                        )}
+                        {classroom.year_group && (
+                          <div><dt className="inline font-medium text-[var(--text-heading)]">Level: </dt><dd className="inline">{classroom.year_group}</dd></div>
+                        )}
+                        {classroom.learning_objectives && (
+                          <div>
+                            <dt className="font-medium text-[var(--text-heading)]">Learning objectives:</dt>
+                            <dd className="mt-1 whitespace-pre-line">{classroom.learning_objectives}</dd>
+                          </div>
+                        )}
+                      </dl>
+                      <Link
+                        href={`/teacher/classrooms/${params.id}/edit`}
+                        className="mt-3 inline-block text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                      >
+                        Edit curriculum profile →
+                      </Link>
+                    </div>
+                  )}
+
                   <label className="block space-y-2">
                     <span className="text-base font-medium text-[var(--text-heading)]">Topic brief</span>
                     <textarea

@@ -19,6 +19,10 @@ export default function NewClassroomPage() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
+  const [subject, setSubject] = useState("");
+  const [yearGroup, setYearGroup] = useState("");
+  const [learningObjectives, setLearningObjectives] = useState("");
+  const [syllabusNotes, setSyllabusNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,7 +31,15 @@ export default function NewClassroomPage() {
     setError("");
     setSubmitting(true);
     try {
-      const classroom = await apiPost("/classrooms", { name, code, description: description || null });
+      const classroom = await apiPost("/classrooms", {
+        name,
+        code,
+        description: description || null,
+        subject: subject || null,
+        year_group: yearGroup || null,
+        learning_objectives: learningObjectives || null,
+        syllabus_notes: syllabusNotes || null,
+      });
       router.push(`/teacher/classrooms/${classroom.id}`);
     } catch (err) {
       setError(err.message || "Failed to create classroom");
@@ -95,6 +107,64 @@ export default function NewClassroomPage() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </label>
+
+            <div className="border-t border-[var(--border-subtle)] pt-5">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--color-primary)]">
+                Curriculum Profile <span className="font-normal normal-case tracking-normal text-[var(--text-faint)]">— optional</span>
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                These constraints are injected into every AI lesson generated in this classroom.
+              </p>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-[var(--text-heading)]">Subject</span>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder="e.g. Physics"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    aria-label="Subject"
+                  />
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium text-[var(--text-heading)]">Year group / level</span>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder="e.g. Year 10 / GCSE"
+                    value={yearGroup}
+                    onChange={(e) => setYearGroup(e.target.value)}
+                    aria-label="Year group or level"
+                  />
+                </label>
+              </div>
+
+              <label className="mt-4 block space-y-2">
+                <span className="text-sm font-medium text-[var(--text-heading)]">Learning objectives</span>
+                <textarea
+                  rows={4}
+                  className={inputClass}
+                  placeholder={"e.g. Understand Newton's three laws\nApply F=ma to real-world scenarios"}
+                  value={learningObjectives}
+                  onChange={(e) => setLearningObjectives(e.target.value)}
+                  aria-label="Learning objectives"
+                />
+              </label>
+
+              <label className="mt-4 block space-y-2">
+                <span className="text-sm font-medium text-[var(--text-heading)]">Syllabus notes</span>
+                <textarea
+                  rows={3}
+                  className={inputClass}
+                  placeholder="e.g. AQA GCSE Physics spec — do not cover nuclear physics"
+                  value={syllabusNotes}
+                  onChange={(e) => setSyllabusNotes(e.target.value)}
+                  aria-label="Syllabus notes"
+                />
+              </label>
+            </div>
 
             {error && <p className={alertError}>{error}</p>}
 

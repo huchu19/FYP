@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiGet, apiPost } from "@/lib/api";
 import ConceptGraph from "@/components/knowledge-graph/ConceptGraph";
@@ -17,10 +17,25 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
   const params = use(paramsPromise);
   const classroomId = params.id;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [graph, setGraph] = useState(null);
   const [blindSpots, setBlindSpots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Highlighted node IDs arriving from post-quiz diff panel
+  const [changedIds, setChangedIds] = useState(() => {
+    const raw = searchParams?.get("changed");
+    if (!raw) return new Set();
+    return new Set(raw.split(",").map(Number).filter(Boolean));
+  });
+
+  // Clear highlights after 4 seconds
+  useEffect(() => {
+    if (!changedIds.size) return;
+    const t = setTimeout(() => setChangedIds(new Set()), 4000);
+    return () => clearTimeout(t);
+  }, [changedIds.size]);
 
   // Practice targets state
   const [showPractice, setShowPractice] = useState(false);
@@ -139,17 +154,17 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
           </p>
         </div>
         <div className={`${card} p-6 text-center`}>
-          <p className={statLabel}>Self-Awareness</p>
+          <p className={statLabel}>Calibration</p>
           <p className={`mt-4 font-display text-[3rem] font-semibold tracking-[-0.05em] ${
             avgMeta == null ? "text-[var(--text-faint)]" : avgMeta >= 75 ? "text-[var(--color-success)]" : avgMeta >= 50 ? "text-[var(--color-accent)]" : "text-[var(--color-danger)]"
           }`}>
             {loading ? "..." : avgMeta != null ? `${avgMeta}%` : "—"}
           </p>
-          {!loading && avgMeta != null && (
-            <p className="mt-1 text-xs text-[var(--text-faint)]">
-              {avgMeta >= 75 ? "Well calibrated" : avgMeta >= 50 ? "Improving" : "Needs attention"}
-            </p>
-          )}
+          <p className="mt-1 text-xs text-[var(--text-faint)]">
+            {!loading && avgMeta != null
+              ? avgMeta >= 75 ? "Well calibrated" : avgMeta >= 50 ? "Improving" : "Needs attention"
+              : "Toggle calibration view"}
+          </p>
         </div>
       </div>
 
@@ -164,7 +179,7 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
                 No concepts mapped yet
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
-                Once lessons and quizzes have generated enough concept data, your knowledge map will start filling out here.
+                Your teacher needs to publish a lesson and generate concepts from it first. Once that&apos;s done, your map will appear here and update automatically as you take quizzes.
               </p>
             </div>
           ) : (
@@ -174,77 +189,41 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
                   nodes={graph.nodes}
                   links={graph.links}
                   hasMasteryData={graph.nodes.some((node) => node.mastery > 0)}
-                  width={900}
-                  height={540}
+                  classroomId={classroomId}
+                  changedIds={changedIds}
+                  onVerify={() => handleGenerateQuiz()}
                 />
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <div className={`${card} p-6`}>
-                  <h2 className="font-display text-[2.4rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
-                    Concept Status
+                  <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
+                    Recommended Focus
                   </h2>
-                  <div className="mt-5 grid gap-4 md:grid-cols-2">
-                    {nodes.map((node) => {
-                      const mastery = Math.round((node.mastery || 0) * 100);
-                      const tone = mastery >= 80
-                        ? "text-[var(--color-success)]"
-                        : mastery >= 60
-                          ? "text-[var(--color-accent)]"
-                          : "text-[var(--color-danger)]";
-                      const width = `${Math.max(mastery, 8)}%`;
-                      return (
-                        <div key={node.id} className="rounded-[1rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <h3 className="font-display text-[1.7rem] font-semibold tracking-[-0.04em] text-[var(--text-heading)]">
-                              {node.label}
-                            </h3>
-                            <span className={`text-sm font-semibold ${tone}`}>{mastery}%</span>
-                          </div>
-                          <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[var(--bg-sunken)]">
-                            <div
-                              className={`h-2.5 rounded-full ${mastery >= 80 ? "bg-[var(--color-success)]" : mastery >= 60 ? "bg-[var(--color-accent)]" : "bg-[var(--color-danger)]"}`}
-                              style={{ width }}
-                            />
-                          </div>
-                          <p className="mt-3 text-sm text-[var(--text-muted)]">
-                            {node.connection_count || 0} connections
+                  {blindSpots.length > 0 ? (
+                    <div className="mt-5 space-y-3">
+                      {blindSpots.map((spot) => (
+                        <div key={spot.concept_id} className="rounded-[1rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-4">
+                          <p className="text-base font-semibold text-[var(--text-heading)]">{spot.concept_name}</p>
+                          <p className="mt-1 text-sm text-[var(--text-muted)]">
+                            {Math.round(spot.mastery * 100)}% mastery
                           </p>
+                          {spot.blocks.length > 0 && (
+                            <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">
+                              Blocks: {spot.blocks.join(", ")}
+                            </p>
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
+                      No urgent blind spots detected. Keep reinforcing amber concepts to push them into mastery.
+                    </p>
+                  )}
                 </div>
 
-                <aside className="space-y-5">
-                  <div className={`${card} p-6`}>
-                    <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
-                      Recommended Focus
-                    </h2>
-                    {blindSpots.length > 0 ? (
-                      <div className="mt-5 space-y-3">
-                        {blindSpots.map((spot) => (
-                          <div key={spot.concept_id} className="rounded-[1rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-4">
-                            <p className="text-base font-semibold text-[var(--text-heading)]">{spot.concept_name}</p>
-                            <p className="mt-1 text-sm text-[var(--text-muted)]">
-                              {Math.round(spot.mastery * 100)}% mastery
-                            </p>
-                            {spot.blocks.length > 0 && (
-                              <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[var(--text-faint)]">
-                                Blocks: {spot.blocks.join(", ")}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
-                        No urgent blind spots detected right now. Keep reinforcing the yellow-zone concepts to push them into mastery.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Practice Weak Concepts */}
+                <div className="space-y-4">
                   {!showPractice ? (
                     <button
                       onClick={handlePracticeClick}
@@ -266,73 +245,58 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
                     />
                   )}
 
-                  {/* ZPD / Zone of Proximal Development */}
                   {zpdConcepts.length > 0 && (
                     <div className={`${card} p-6`}>
-                      <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
-                        Zone of Proximal Development
+                      <h2 className="font-display text-[1.6rem] font-semibold tracking-[-0.04em] text-[var(--text-heading)]">
+                        Growth Edge
                       </h2>
-                      <p className="mt-2 text-xs text-[var(--text-muted)]">
-                        Concepts where you perform better with hints than without — these are your growth edge.
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        You score higher with hints than without — practice unassisted to close the gap.
                       </p>
                       <div className="mt-4 space-y-3">
                         {zpdConcepts.slice(0, 5).map((node) => (
                           <div key={node.id} className="rounded-[1rem] border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-3">
                             <p className="text-base font-semibold text-[var(--text-heading)]">{node.name}</p>
-                            <div className="mt-2 flex items-center gap-3 text-xs">
-                              <span className="text-[var(--text-muted)]">
-                                {Math.round((node.unaided_mastery || 0) * 100)}% unaided
-                              </span>
+                            <div className="mt-1 flex items-center gap-3 text-xs">
+                              <span className="text-[var(--text-muted)]">{Math.round((node.unaided_mastery || 0) * 100)}% unaided</span>
                               <span className="text-[var(--color-primary)]">→</span>
-                              <span className="font-semibold text-[var(--color-success)]">
-                                {Math.round((node.aided_mastery || 0) * 100)}% with hints
-                              </span>
+                              <span className="font-semibold text-[var(--color-success)]">{Math.round((node.aided_mastery || 0) * 100)}% with hints</span>
                             </div>
-                            <p className="mt-1 text-[0.65rem] text-[var(--text-faint)]">
-                              Keep practising without hints to close this gap
-                            </p>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
+                </div>
 
-                  {/* Calibration warning */}
-                  {overconfidentConcepts.length > 0 && (
-                    <div className={`${card} border-amber-500/20 p-6`}>
-                      <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-amber-500">
-                        Calibration Alert
-                      </h2>
-                      <p className="mt-2 text-xs text-[var(--text-muted)]">
-                        Your confidence and actual performance diverge on these concepts. Review them more carefully.
-                      </p>
-                      <div className="mt-4 space-y-2">
-                        {overconfidentConcepts.map((node) => (
-                          <div key={node.id} className="flex items-center justify-between rounded-lg bg-amber-500/5 px-3 py-2 text-sm">
-                            <span className="text-[var(--text-heading)]">{node.name}</span>
-                            <span className="text-xs text-amber-500">
-                              {Math.round(node.metacognitive_score * 100)}% calibration
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                {overconfidentConcepts.length > 0 && (
+                  <div className={`${card} border-amber-500/20 p-6`}>
+                    <h2 className="font-display text-[1.6rem] font-semibold tracking-[-0.04em] text-amber-500">
+                      Calibration Alert
+                    </h2>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Confidence and performance diverge on these concepts.
+                    </p>
+                    <div className="mt-4 space-y-2">
+                      {overconfidentConcepts.map((node) => (
+                        <div key={node.id} className="flex items-center justify-between rounded-lg bg-amber-500/5 px-3 py-2 text-sm">
+                          <span className="text-[var(--text-heading)]">{node.name}</span>
+                          <span className="text-xs text-amber-500">{Math.round(node.metacognitive_score * 100)}% calibration</span>
+                        </div>
+                      ))}
                     </div>
-                  )}
-
-                  <Link href={`/student/classrooms/${classroomId}`} className={`${card} block p-6 transition hover:-translate-y-1 hover:border-[var(--color-accent)]/24`}>
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
-                      Back to class
-                    </p>
-                    <p className="mt-4 font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
-                      Return to the classroom workspace
-                    </p>
-                    <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--color-primary)]">
-                      Open class
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </span>
-                  </Link>
-                </aside>
+                  </div>
+                )}
               </div>
+
+              <Link
+                href={`/student/classrooms/${classroomId}`}
+                className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-faint)] transition hover:text-[var(--color-primary)]"
+                aria-label="Back to classroom"
+              >
+                <ArrowRightIcon className="h-4 w-4 rotate-180" />
+                Back to classroom
+              </Link>
             </div>
           )}
         </>

@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { apiGet, apiPost } from "@/lib/api";
 import KahootQuiz from "@/components/quiz/KahootQuiz";
+import ConceptMasteryDiff from "@/components/knowledge-graph/ConceptMasteryDiff";
 import {
   cardElevated, btnPrimary, btnSecondary, breadcrumb, breadcrumbLink,
   pageSection, inputClass, loadingText, badgeViolet,
@@ -529,7 +530,7 @@ export default function StudentQuizPage({ params: paramsPromise }) {
       )}
 
       {!isKahoot && (
-        <div className="flex gap-3 pt-2">
+        <div className="space-y-4 pt-2">
           {!submitted ? (
             <button
               onClick={handleSubmit}
@@ -540,15 +541,24 @@ export default function StudentQuizPage({ params: paramsPromise }) {
             </button>
           ) : (
             <>
-              <button onClick={handleRetry} className={btnSecondary}>
-                Try again
-              </button>
-              <Link
-                href={`/student/classrooms/${params.id}/knowledge-graph`}
-                className={btnPrimary}
-              >
-                Return to Knowledge Map
-              </Link>
+              {/* Concept mastery diff panel */}
+              {result?.concept_deltas?.length > 0 && (
+                <ConceptMasteryDiff
+                  conceptDeltas={result.concept_deltas}
+                  classroomId={params.id}
+                />
+              )}
+              <div className="flex gap-3">
+                <button onClick={handleRetry} className={btnSecondary}>
+                  Try again
+                </button>
+                <Link
+                  href={`/student/classrooms/${params.id}/knowledge-graph`}
+                  className={btnPrimary}
+                >
+                  Knowledge Map
+                </Link>
+              </div>
             </>
           )}
         </div>

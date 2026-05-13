@@ -210,6 +210,13 @@ class KnowledgeGraphService:
         concepts = self.list_concepts(db, classroom_id)
         concept_ids = {c.id for c in concepts}
 
+        # Fetch lesson titles for the curriculum-column layout
+        lesson_ids = {c.lesson_id for c in concepts if c.lesson_id}
+        lesson_title_map: dict[int, str] = {}
+        if lesson_ids:
+            lessons = db.query(Lesson).filter(Lesson.id.in_(lesson_ids)).all()
+            lesson_title_map = {l.id: l.title for l in lessons}
+
         edges = (
             db.query(ConceptPrerequisite)
             .filter(ConceptPrerequisite.concept_id.in_(concept_ids))
@@ -244,6 +251,7 @@ class KnowledgeGraphService:
                 "name": c.name,
                 "description": c.description,
                 "lesson_id": c.lesson_id,
+                "lesson_title": lesson_title_map.get(c.lesson_id) if c.lesson_id else None,
                 "mastery": mastery_map.get(c.id, {}).get("mastery", 0.0),
                 "metacognitive_score": mastery_map.get(c.id, {}).get("metacognitive_score"),
                 "unaided_mastery": mastery_map.get(c.id, {}).get("unaided_mastery"),
@@ -454,8 +462,29 @@ class KnowledgeGraphService:
             for t in targets
         ]
 
+        # Collect question texts from recent concept-practice quizzes to avoid repetition
+        from app.models.quiz import Quiz
+        recent_quizzes = (
+            db.query(Quiz)
+            .filter(
+                Quiz.classroom_id == classroom_id,
+                Quiz.created_by_user_id == student_id,
+                Quiz.quiz_type == "concept_practice",
+            )
+            .order_by(Quiz.id.desc())
+            .limit(5)
+            .all()
+        )
+        avoid_questions: list[str] = []
+        for q in recent_quizzes:
+            for item in q.questions or []:
+                if isinstance(item, dict) and item.get("question"):
+                    avoid_questions.append(item["question"])
+
         questions = self.ai.generate_concept_inventory(
-            concepts_with_mastery, num_questions=num_questions
+            concepts_with_mastery,
+            num_questions=num_questions,
+            avoid_questions=avoid_questions or None,
         )
 
         # Resolve AI-generated concept_name tags → concept IDs
@@ -501,6 +530,63 @@ class KnowledgeGraphService:
             "targets": targets,
             "message": f"Generated {len(questions)} questions targeting {len(targets)} weak concepts",
         }
+
+    # -----------------------------------------------------------------
+    # Student self-assessment (OLM negotiability)
+    # -----------------------------------------------------------------
+
+    def self_assess(
+        self,
+        db: Session,
+        *,
+        student_id: int,
+        concept_id: int,
+        confidence: int,
+    ) -> dict[str, Any]:
+        """Record a student's self-declared confidence for a concept.
+
+        Appends a self-claim evidence point. If confidence is high (≥4) but
+        measured mastery is low (<0.5), flags that a verification quiz is warranted.
+        """
+        from datetime import datetime, timezone
+
+        concept = db.query(Concept).filter(Concept.id == concept_id).first()
+        if concept is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Concept not found")
+
+        row = (
+            db.query(StudentConceptMastery)
+            .filter(
+                StudentConceptMastery.student_id == student_id,
+                StudentConceptMastery.concept_id == concept_id,
+            )
+            .first()
+        )
+        if row is None:
+            row = StudentConceptMastery(
+                student_id=student_id,
+                concept_id=concept_id,
+                mastery_score=0.0,
+                attempts=0,
+                evidence=[],
+            )
+            db.add(row)
+
+        evidence_list = list(row.evidence or [])
+        evidence_list.append(
+            {
+                "source": "self_claim",
+                "confidence": confidence,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        if len(evidence_list) > 20:
+            evidence_list = evidence_list[-20:]
+        row.evidence = evidence_list
+        db.flush()
+
+        verification_needed = confidence >= 4 and row.mastery_score < 0.5
+        return {"stored": True, "verification_needed": verification_needed}
 
     # -----------------------------------------------------------------
     # Mastery updates

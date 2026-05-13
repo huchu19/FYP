@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -14,15 +15,29 @@ export default function StudentLayout({ children }) {
     if (loading) return;
     if (!user) {
       router.replace("/login");
-      return;
     }
-    if (user.role !== "student") {
-      router.replace(user.role === "teacher" ? "/teacher" : "/");
-    }
+    // Teachers are allowed through in preview mode — no redirect
   }, [loading, router, user]);
 
-  if (loading || !user || user.role !== "student") {
-    return <section className="p-10 text-sm text-[var(--text-faint)]">Checking your student session...</section>;
+  if (loading || !user) {
+    return <section className="p-10 text-sm text-[var(--text-faint)]">Checking your session...</section>;
+  }
+
+  if (user.role === "teacher") {
+    const banner = (
+      <div className="flex shrink-0 items-center justify-between gap-4 rounded-[1rem] bg-[var(--color-primary)] px-5 py-2.5">
+        <p className="text-sm font-medium text-white">
+          Teacher Preview — you&apos;re viewing the student experience
+        </p>
+        <Link
+          href="/teacher"
+          className="shrink-0 text-sm font-medium text-white/80 underline hover:text-white"
+        >
+          Back to Dashboard
+        </Link>
+      </div>
+    );
+    return <DashboardFrame role="student" banner={banner}>{children}</DashboardFrame>;
   }
 
   return <DashboardFrame role="student">{children}</DashboardFrame>;

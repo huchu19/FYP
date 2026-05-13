@@ -1,3 +1,8 @@
+# Claude Code tooling (local only)
+CLAUDE.md
+AGENTS.md
+.claude/
+
 # OS junk
 .DS_Store
 

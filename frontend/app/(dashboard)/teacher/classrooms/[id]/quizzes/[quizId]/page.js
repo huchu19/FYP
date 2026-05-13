@@ -136,6 +136,31 @@ export default function QuizDetailPage({ params: paramsPromise }) {
             <span className="mr-2 text-[var(--color-primary)]">{idx + 1}.</span>
             {q.question}
           </p>
+          {(q.options || []).length > 0 && (
+            <div className="mb-4 grid gap-2 sm:grid-cols-2">
+              {(q.options || []).map((opt, oi) => (
+                <div
+                  key={oi}
+                  className={`rounded-lg border px-3 py-2 text-sm ${
+                    opt === q.correct_answer
+                      ? "border-emerald-500/40 bg-emerald-500/10 font-semibold text-[var(--color-success)]"
+                      : "border-[var(--border-card)] bg-[var(--bg-sunken)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {opt === q.correct_answer && (
+                    <span className="mr-1.5 text-xs">✓</span>
+                  )}
+                  {opt}
+                </div>
+              ))}
+            </div>
+          )}
+          {q.correct_answer && (q.options || []).length === 0 && (
+            <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-[var(--color-success)]">
+              <span className="text-xs font-semibold text-[var(--color-success)] block mb-0.5">Model Answer</span>
+              {q.correct_answer}
+            </div>
+          )}
           {q.reasoning_prompt && (
             <div className="mb-4 rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-accent-soft)] p-3">
               <p className="text-xs font-semibold text-[var(--color-accent)] mb-1">Reasoning Prompt</p>
@@ -152,10 +177,11 @@ export default function QuizDetailPage({ params: paramsPromise }) {
               </ol>
             </div>
           )}
-          <div className="rounded-lg border border-[var(--border-card)] bg-[var(--bg-sunken)] p-3">
-            <p className="text-xs font-semibold text-[var(--text-faint)] mb-2">Student Reasoning (they will write here)</p>
-            <div className="min-h-12 text-xs text-[var(--text-faint)] italic">Student&apos;s response will appear here...</div>
-          </div>
+          {q.explanation && (
+            <p className="mt-3 text-xs text-[var(--text-faint)]">
+              <span className="font-semibold text-[var(--text-muted)]">Explanation:</span> {q.explanation}
+            </p>
+          )}
         </div>
       );
     }
@@ -228,10 +254,10 @@ export default function QuizDetailPage({ params: paramsPromise }) {
           <button
             onClick={handleTogglePublish}
             disabled={publishing || editing}
-            className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
+            className={`rounded-lg border px-5 py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
               quiz.is_published
-                ? "border border-[var(--color-warning)]/30 text-[var(--color-warning)] hover:bg-amber-500/10"
-                : "bg-gradient-to-r from-cyan-500 to-violet-500 text-white shadow-[var(--shadow-primary)] hover:shadow-[var(--shadow-primary-hover)]"
+                ? "border-[var(--color-warning)]/30 text-[var(--color-warning)] hover:bg-amber-500/10"
+                : "border-[var(--color-primary)]/40 text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
             }`}
           >
             {publishing ? "..." : quiz.is_published ? "Unpublish" : "Publish"}

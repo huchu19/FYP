@@ -7,7 +7,7 @@ from app.models.user import User
 from app.services.classroom_service import ClassroomService
 from app.services.lesson_service import LessonService
 from app.services.quiz_service import QuizService
-from app.schemas.classroom import Classroom, ClassroomCreate, ClassroomJoin
+from app.schemas.classroom import Classroom, ClassroomCreate, ClassroomJoin, ClassroomUpdate
 from app.schemas.lesson import Lesson as LessonSchema
 from app.schemas.quiz import Quiz as QuizSchema
 
@@ -72,6 +72,16 @@ def list_classroom_quizzes(
     service.get_classroom(db, classroom_id, actor_user=current_user)
     published_only = current_user.role == "student"
     return quiz_service.list_for_classroom(db, classroom_id, published_only=published_only)
+
+
+@router.patch("/{classroom_id}", response_model=Classroom)
+def update_classroom(
+    classroom_id: int,
+    payload: ClassroomUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("teacher")),
+) -> Classroom:
+    return service.update_classroom(db, classroom_id, payload, actor_user=current_user)
 
 
 @router.delete("/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT)

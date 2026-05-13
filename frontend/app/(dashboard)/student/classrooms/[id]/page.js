@@ -19,6 +19,7 @@ export default function StudentClassroomPage({ params: paramsPromise }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    localStorage.setItem("edunexus_student_last_classroom", params.id);
     let cancelled = false;
     Promise.all([
       apiGet(`/classrooms/${params.id}`),

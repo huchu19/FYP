@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" data-theme="light" suppressHydrationMismatch>
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-[var(--bg-surface)] text-[var(--text-primary)] antialiased">
         <ThemeProvider>
           <AuthProvider>

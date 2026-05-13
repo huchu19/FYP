@@ -41,13 +41,6 @@ EduNexus is a web platform that uses AI to generate educational content, adaptiv
 /docs       Project documentation (requirements, architecture, milestones, report)
 ```
 
-## AI Workflow
-
-Claude Code is the primary AI coding assistant. Codex is used as a secondary tool for debugging and review.
-
-- `CLAUDE.md` — Claude Code project instructions
-- `AGENTS.md` — Codex-specific fallback behavior
-
 ## Testing
 
 - **Backend:** `cd backend && ../.venv/bin/pytest tests/` (auth/classroom integration tests)
