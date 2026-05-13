@@ -63,7 +63,7 @@ EduNexus integrates these workflows into a single platform:
 
 ## Prerequisites
 
-- **Python 3.9** (the project virtualenv is at `.venv/` in the repo root)
+- **Python 3.9+** with a local virtual environment created by the user
 - **Node.js 18+** and **npm**
 - **PostgreSQL 14+** running locally on port `5432`
 - A **Gemini API key** (free tier) — get one at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
@@ -98,7 +98,7 @@ DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/edunexus
 APP_ENV=dev
 APP_SECRET_KEY=change_this_to_a_long_random_string
 GEMINI_API_KEY=your_gemini_key_here
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=your_openai_api_key_here
 CORS_ALLOW_ORIGINS=http://localhost:3000
 TEST_DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/edunexus_test
 ```
