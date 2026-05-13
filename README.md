@@ -9,7 +9,6 @@ An AI-powered adaptive learning platform. Teachers generate lessons and quizzes 
 ## Screenshots
 
 | | |
-|---|---|
 | *Landing page* | *Teacher dashboard* |
 | ![Landing page](docs/images/landing.png) | ![Teacher dashboard](docs/images/teacher-dashboard.png) |
 | *Student dashboard with XP, badges, and enrolled classrooms* | *Knowledge map — concept mastery graph with blind-spot detection* |
