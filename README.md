@@ -10,12 +10,12 @@ An AI-powered adaptive learning platform. Teachers generate lessons and quizzes 
 
 | | |
 |---|---|
-| ![Landing page](docs/images/landing.png) | ![Teacher dashboard](docs/images/teacher-dashboard.png) |
 | *Landing page* | *Teacher dashboard* |
-| ![Student dashboard](docs/images/student-dashboard.png) | ![Knowledge map](docs/images/knowledge-map.png) |
+| ![Landing page](docs/images/landing.png) | ![Teacher dashboard](docs/images/teacher-dashboard.png) |
 | *Student dashboard with XP, badges, and enrolled classrooms* | *Knowledge map — concept mastery graph with blind-spot detection* |
-| ![Metacognitive quiz](docs/images/quiz-student.png) | ![Teach mode](docs/images/teach-mode.png) |
+| ![Student dashboard](docs/images/student-dashboard.png) | ![Knowledge map](docs/images/knowledge-map.png) |
 | *Metacognitive quiz — explain-reasoning, error-analysis, and transfer question types* | *Teach Mode — student explains a concept to an AI "confused learner"* |
+| ![Metacognitive quiz](docs/images/quiz-student.png) | ![Teach mode](docs/images/teach-mode.png) |
 
 ---
 
