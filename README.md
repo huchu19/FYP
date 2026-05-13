@@ -6,6 +6,19 @@ An AI-powered adaptive learning platform. Teachers generate lessons and quizzes 
 
 ---
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Landing page](docs/images/landing.png) | ![Teacher dashboard](docs/images/teacher-dashboard.png) |
+| *Landing page* | *Teacher dashboard* |
+| ![Student dashboard](docs/images/student-dashboard.png) | ![Knowledge map](docs/images/knowledge-map.png) |
+| *Student dashboard with XP, badges, and enrolled classrooms* | *Knowledge map — concept mastery graph with blind-spot detection* |
+| ![Metacognitive quiz](docs/images/quiz-student.png) | ![Teach mode](docs/images/teach-mode.png) |
+| *Metacognitive quiz — explain-reasoning, error-analysis, and transfer question types* | *Teach Mode — student explains a concept to an AI "confused learner"* |
+
+---
+
 ## Project Overview
 
 EduNexus addresses the fragmentation problem in digital education. Teachers today rely on disconnected tools — a CMS for content, a separate quiz tool, a spreadsheet for grades — with no data flowing between them. Students receive one-size-fits-all content with no feedback on how they actually understand material.
