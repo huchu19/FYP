@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { apiPost } from "@/lib/api";
 import { alertError, btnPrimary, inputClass } from "@/lib/styles";
 import { ArrowRightIcon, BookIcon } from "@/components/layout/icons";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { loading, login, user } = useAuth();
@@ -172,5 +172,13 @@ export default function RegisterPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }
