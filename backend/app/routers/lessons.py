@@ -10,7 +10,7 @@ from app.models.user import User
 from app.services.lesson_service import LessonService
 from app.services.document_service import DocumentService
 from app.services.quiz_service import QuizService
-from app.schemas.lesson import Lesson, LessonCreate, LessonReformat, LessonUpdate, LessonDocument
+from app.schemas.lesson import Lesson, LessonCreate, LessonRefine, LessonReformat, LessonUpdate, LessonDocument
 from app.schemas.quiz import Quiz as QuizSchema
 
 router = APIRouter(prefix="/lessons", tags=["lessons"])
@@ -95,6 +95,19 @@ def reformat_lesson(
 ) -> Lesson:
     return service.reformat_lesson(
         db, lesson_id, content_format=payload.content_format, actor_user=current_user
+    )
+
+
+@router.post("/{lesson_id}/refine", response_model=Lesson)
+def refine_lesson(
+    lesson_id: int,
+    payload: LessonRefine,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("teacher")),
+) -> Lesson:
+    """Revise the lesson content according to the teacher's feedback."""
+    return service.refine_lesson(
+        db, lesson_id, instructions=payload.instructions, actor_user=current_user
     )
 
 

@@ -71,3 +71,6 @@ backend/.pgdata/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large report artifacts (attach to a GitHub Release instead of committing)
+docs/*.pdf

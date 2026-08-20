@@ -24,6 +24,15 @@ class LessonReformat(BaseModel):
     content_format: str = Field(..., example="pdf_report")
 
 
+class LessonRefine(BaseModel):
+    instructions: str = Field(
+        ...,
+        min_length=3,
+        max_length=4000,
+        example="Simplify the second section and add a worked example.",
+    )
+
+
 class LessonUpdate(BaseModel):
     title: Optional[str] = Field(None, example="Updated Title")
     body: Optional[str] = Field(None, example="Updated lesson content")

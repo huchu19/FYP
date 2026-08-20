@@ -177,8 +177,10 @@ class TeachingService:
             db, user_id=student_id, classroom_id=session.classroom_id, xp=total_xp
         )
 
-        # Award badges
-        self._award_badges(db, student_id=student_id, session=session, assessment=assessment)
+        # Award badges (returns the ones newly unlocked this session)
+        badges_earned = self._award_badges(
+            db, student_id=student_id, session=session, assessment=assessment
+        )
 
         # Update concept mastery if concept_id is set
         if session.concept_id:
@@ -199,6 +201,7 @@ class TeachingService:
 
         result = self._session_to_dict(session)
         result["xp_earned"] = total_xp
+        result["badges_earned"] = badges_earned
         return result
 
     # -----------------------------------------------------------------
@@ -292,8 +295,20 @@ class TeachingService:
         student_id: int,
         session: TeachingSession,
         assessment: dict[str, Any],
-    ) -> None:
+    ) -> list[str]:
+        """Award eligible badges and return the ones newly unlocked this session."""
         classroom_id = session.classroom_id
+        existing = set(self._current_badges(db, student_id=student_id, classroom_id=classroom_id))
+        earned: list[str] = []
+
+        def award(badge: str) -> None:
+            if badge in existing:
+                return
+            self.gamification.add_badge(
+                db, user_id=student_id, classroom_id=classroom_id, badge=badge
+            )
+            existing.add(badge)
+            earned.append(badge)
 
         # first_teaching — first completed session
         completed_count = (
@@ -305,21 +320,30 @@ class TeachingService:
             .count()
         )
         if completed_count <= 1:  # This is the first (count includes current)
-            self.gamification.add_badge(
-                db, user_id=student_id, classroom_id=classroom_id, badge="first_teaching"
-            )
+            award("first_teaching")
 
         # clear_explainer — clarity score >= 0.8
         if assessment.get("clarity", 0) >= 0.8:
-            self.gamification.add_badge(
-                db, user_id=student_id, classroom_id=classroom_id, badge="clear_explainer"
-            )
+            award("clear_explainer")
 
         # patient_teacher — at least 10 turns and overall >= 0.7
         if session.turn_count >= 10 and assessment.get("overall_score", 0) >= 0.7:
-            self.gamification.add_badge(
-                db, user_id=student_id, classroom_id=classroom_id, badge="patient_teacher"
-            )
+            award("patient_teacher")
+
+        return earned
+
+    def _current_badges(
+        self,
+        db: Session,
+        *,
+        student_id: int,
+        classroom_id: int,
+    ) -> list[str]:
+        """Return the student's currently-held badges for this classroom."""
+        rows = self.gamification.user_rows(
+            db, user_id=student_id, classroom_id=classroom_id
+        )
+        return list(rows[0].badges) if rows and rows[0].badges else []
 
     @staticmethod
     def _update_concept_mastery(

@@ -143,23 +143,9 @@ class LessonService:
         content_format: str,
         actor_user: User,
     ) -> Lesson:
-        lesson = self.get_lesson(db, lesson_id)
-        classroom = self.classroom_repository.get_by_id(db, lesson.classroom_id)
-        if classroom is None or classroom.teacher_id != actor_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
-            )
-
-        curriculum_parts = []
-        if classroom.subject:
-            curriculum_parts.append(f"Subject: {classroom.subject}")
-        if classroom.year_group:
-            curriculum_parts.append(f"Year group / level: {classroom.year_group}")
-        if classroom.learning_objectives:
-            curriculum_parts.append(f"Learning objectives:\n{classroom.learning_objectives}")
-        if classroom.syllabus_notes:
-            curriculum_parts.append(f"Syllabus notes:\n{classroom.syllabus_notes[:2000]}")
-        curriculum_context = "\n".join(curriculum_parts) or None
+        lesson, curriculum_context = self._owned_lesson_with_context(
+            db, lesson_id, actor_user=actor_user
+        )
 
         prompt = lesson.prompt or lesson.title
         try:
@@ -182,6 +168,65 @@ class LessonService:
         db.commit()
         db.refresh(lesson)
         return lesson
+
+    def refine_lesson(
+        self,
+        db: Session,
+        lesson_id: int,
+        *,
+        instructions: str,
+        actor_user: User,
+    ) -> Lesson:
+        """Revise the lesson content per the teacher's natural-language feedback."""
+        lesson, curriculum_context = self._owned_lesson_with_context(
+            db, lesson_id, actor_user=actor_user
+        )
+
+        try:
+            ai_result = self.ai_service.refine_lesson(
+                title=lesson.title,
+                outline=list(lesson.outline or []),
+                body=lesson.body or "",
+                instructions=instructions,
+                curriculum_context=curriculum_context,
+            )
+        except Exception as exc:
+            logger.exception("AI refine failed")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"AI refinement failed: {exc}",
+            )
+
+        lesson.title = ai_result.get("title", lesson.title)
+        lesson.outline = ai_result.get("outline", lesson.outline)
+        lesson.body = ai_result.get("body", lesson.body)
+
+        db.add(lesson)
+        db.commit()
+        db.refresh(lesson)
+        return lesson
+
+    def _owned_lesson_with_context(
+        self, db: Session, lesson_id: int, *, actor_user: User
+    ) -> tuple[Lesson, str | None]:
+        """Fetch a lesson owned by the actor's classroom, plus its curriculum context."""
+        lesson = self.get_lesson(db, lesson_id)
+        classroom = self.classroom_repository.get_by_id(db, lesson.classroom_id)
+        if classroom is None or classroom.teacher_id != actor_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+            )
+
+        curriculum_parts = []
+        if classroom.subject:
+            curriculum_parts.append(f"Subject: {classroom.subject}")
+        if classroom.year_group:
+            curriculum_parts.append(f"Year group / level: {classroom.year_group}")
+        if classroom.learning_objectives:
+            curriculum_parts.append(f"Learning objectives:\n{classroom.learning_objectives}")
+        if classroom.syllabus_notes:
+            curriculum_parts.append(f"Syllabus notes:\n{classroom.syllabus_notes[:2000]}")
+        return lesson, "\n".join(curriculum_parts) or None
 
     def publish_lesson(self, db: Session, lesson_id: int, *, actor_user: User) -> Lesson:
         lesson = self.get_lesson(db, lesson_id)

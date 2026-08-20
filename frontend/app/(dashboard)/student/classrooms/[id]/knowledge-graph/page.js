@@ -7,7 +7,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api";
 import ConceptGraph from "@/components/knowledge-graph/ConceptGraph";
 import PracticeTargetsPanel from "@/components/knowledge-graph/PracticeTargetsPanel";
-import { card, btnPrimary, pageSection, statLabel } from "@/lib/styles";
+import FormativeRunner from "@/components/formative/FormativeRunner";
+import { card, btnPrimary, btnSecondary, pageSection, statLabel } from "@/lib/styles";
 import {
   ArrowRightIcon,
   BrainIcon,
@@ -42,6 +43,32 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
   const [practiceTargets, setPracticeTargets] = useState(null);
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [generating, setGenerating] = useState(false);
+
+  // Prerequisite diagnostic state
+  const [diagConceptId, setDiagConceptId] = useState("");
+  const [diagAssessment, setDiagAssessment] = useState(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagMessage, setDiagMessage] = useState("");
+
+  async function startDiagnostic() {
+    if (!diagConceptId) return;
+    setDiagLoading(true);
+    setDiagMessage("");
+    try {
+      const res = await apiPost("/formative-assessments/prerequisite-diagnostic", {
+        concept_id: Number(diagConceptId),
+      });
+      if (res.assessment_id) {
+        setDiagAssessment(res);
+      } else {
+        setDiagMessage(res.message || "This concept has no prerequisites to check.");
+      }
+    } catch (err) {
+      setDiagMessage(err.message);
+    } finally {
+      setDiagLoading(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -195,6 +222,37 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
                 />
               </div>
 
+              {/* Prerequisite readiness check */}
+              <div className="rounded-[1.6rem] border border-[var(--color-primary)]/18 bg-[var(--color-primary-soft)] p-5">
+                <h3 className="text-sm font-semibold text-[var(--color-primary)]">Readiness Check</h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                  Before starting a concept, check whether you&apos;re ready for it by testing its prerequisites.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <label htmlFor="diag-concept" className="sr-only">Concept</label>
+                  <select
+                    id="diag-concept"
+                    value={diagConceptId}
+                    onChange={(e) => setDiagConceptId(e.target.value)}
+                    className="rounded-lg border border-[var(--border-card)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-heading)]"
+                  >
+                    <option value="">Select a concept…</option>
+                    {nodes.map((node) => (
+                      <option key={node.id} value={node.id}>{node.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={startDiagnostic}
+                    disabled={!diagConceptId || diagLoading}
+                    className={`${btnSecondary} disabled:opacity-60`}
+                    aria-label="Check readiness for the selected concept"
+                  >
+                    {diagLoading ? "Preparing..." : "Check Readiness"}
+                  </button>
+                </div>
+                {diagMessage && <p className="mt-2 text-xs text-[var(--text-muted)]">{diagMessage}</p>}
+              </div>
+
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <div className={`${card} p-6`}>
                   <h2 className="font-display text-[2rem] font-semibold tracking-[-0.05em] text-[var(--text-heading)]">
@@ -300,6 +358,10 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
             </div>
           )}
         </>
+      )}
+
+      {diagAssessment && (
+        <FormativeRunner assessment={diagAssessment} onClose={() => setDiagAssessment(null)} />
       )}
     </section>
   );

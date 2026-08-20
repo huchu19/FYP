@@ -39,6 +39,28 @@ Guidelines:
 - Use \\n for newlines inside JSON string values. Ensure the output is valid JSON.
 """
 
+LESSON_REFINE_PROMPT = """\
+You are an expert educator revising an existing lesson according to a teacher's
+feedback. You will receive the current lesson (title, outline, body) and the
+teacher's refinement instructions. Apply the instructions faithfully while
+preserving everything the teacher did not ask to change — keep the same overall
+topic, format conventions, and any sections the feedback does not mention.
+
+Respond with ONLY valid JSON matching this schema:
+
+{
+  "title": "The lesson title (unchanged unless the feedback asks for a new one)",
+  "outline": ["Section 1 title", "Section 2 title", ...],
+  "body": "The full revised lesson content in Markdown."
+}
+
+Guidelines:
+- Apply every instruction in the teacher's feedback.
+- Do not shorten or drop content that the feedback does not ask you to change.
+- Keep Markdown heading structure (##) consistent with the outline.
+- Use \\n for newlines inside JSON string values. Ensure the output is valid JSON.
+"""
+
 LESSON_FORMAT_INSTRUCTIONS = {
     "slides": "Structure the body with Markdown headings (##) matching the outline sections. Each section should be a slide.",
     "pdf_report": (
@@ -561,6 +583,40 @@ class AIService:
                 lesson_data["flashcards"] = []
 
         return lesson_data
+
+    def refine_lesson(
+        self,
+        *,
+        title: str,
+        outline: list[str],
+        body: str,
+        instructions: str,
+        curriculum_context: str | None = None,
+    ) -> dict[str, Any]:
+        """Revise an existing lesson according to teacher feedback.
+
+        Unlike generate_lesson, this preserves the current content except where
+        the instructions ask for changes.
+        """
+        outline_text = "\n".join(f"- {s}" for s in (outline or []))
+        user_prompt = ""
+        if curriculum_context:
+            user_prompt += (
+                "[CURRICULUM CONTEXT — follow these constraints for all content]\n"
+                f"{curriculum_context}\n\n"
+            )
+        user_prompt += (
+            f"[CURRENT LESSON]\nTitle: {title}\nOutline:\n{outline_text}\n\n"
+            f"Body:\n{body}\n\n"
+            f"[TEACHER'S REFINEMENT INSTRUCTIONS]\n{instructions}"
+        )
+
+        result = _call_model_with_retry(LESSON_REFINE_PROMPT, user_prompt)
+        return {
+            "title": result.get("title", title),
+            "outline": result.get("outline", outline),
+            "body": result.get("body", body),
+        }
 
     def generate_quiz(
         self,

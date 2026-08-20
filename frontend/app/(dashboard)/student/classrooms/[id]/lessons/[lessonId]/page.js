@@ -9,6 +9,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
 import { speak, stopSpeaking, isTTSSupported } from "@/lib/tts";
 import FlashcardViewer from "@/components/lesson/FlashcardViewer";
 import LessonBodyRenderer from "@/components/lesson/LessonBodyRenderer";
+import FormativeRunner from "@/components/formative/FormativeRunner";
 import {
   breadcrumb, breadcrumbLink, pageSection, badgeCyan, emptyState, loadingText, cardElevated,
 } from "@/lib/styles";
@@ -24,6 +25,9 @@ export default function StudentLessonPage({ params: paramsPromise }) {
   const [quizType, setQuizType] = useState("standard");
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
   const [documents, setDocuments] = useState([]);
+  const [pulseAssessment, setPulseAssessment] = useState(null);
+  const [pulseLoading, setPulseLoading] = useState(false);
+  const [pulseMessage, setPulseMessage] = useState("");
 
   useEffect(() => {
     apiGet(`/lessons/${params.lessonId}`)
@@ -55,6 +59,26 @@ export default function StudentLessonPage({ params: paramsPromise }) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function startPulseCheck() {
+    setPulseLoading(true);
+    setPulseMessage("");
+    setError("");
+    try {
+      const res = await apiPost("/formative-assessments/pulse-check", {
+        lesson_id: params.lessonId,
+      });
+      if (res.assessment_id) {
+        setPulseAssessment(res);
+      } else {
+        setPulseMessage(res.message || "No pulse check is available for this lesson yet.");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPulseLoading(false);
     }
   }
 
@@ -145,6 +169,36 @@ export default function StudentLessonPage({ params: paramsPromise }) {
             ))}
           </ul>
         </div>
+      )}
+
+      {/* Pulse Check CTA */}
+      <div className="rounded-[1.5rem] border border-[var(--color-primary)]/18 bg-[var(--color-primary-soft)] p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-[var(--color-primary)]">Pulse Check</h3>
+            <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+              A quick, adaptive check on this lesson&apos;s key concepts to see what&apos;s sticking.
+            </p>
+            {pulseMessage && (
+              <p className="text-xs text-[var(--text-muted)]">{pulseMessage}</p>
+            )}
+          </div>
+          <button
+            onClick={startPulseCheck}
+            disabled={pulseLoading}
+            className="inline-flex shrink-0 items-center gap-2 rounded-[0.95rem] border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary)] transition hover:-translate-y-0.5 hover:bg-[var(--color-primary)]/18 disabled:opacity-60"
+            aria-label="Start a pulse check for this lesson"
+          >
+            {pulseLoading ? "Preparing..." : "Start Pulse Check"}
+          </button>
+        </div>
+      </div>
+
+      {pulseAssessment && (
+        <FormativeRunner
+          assessment={pulseAssessment}
+          onClose={() => setPulseAssessment(null)}
+        />
       )}
 
       {/* Teach Back CTA */}

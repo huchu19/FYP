@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.routers import auth, classrooms, lessons, quizzes, quiz_attempts, gamification, analytics, knowledge_graph, formative_assessments, teaching_sessions
@@ -14,6 +15,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    """Services raise ValueError for client-fixable problems (bad/missing input).
+
+    Translate these to 400 responses instead of leaking a 500.
+    """
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.get("/")

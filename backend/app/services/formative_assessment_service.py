@@ -11,8 +11,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.concept import StudentConceptMastery
+from app.models.concept import Concept, StudentConceptMastery
 from app.models.formative_assessment import FormativeAssessment
+from app.models.lesson import Lesson
 from app.services.ai import AIService
 from app.services.knowledge_graph import KnowledgeGraphService
 
@@ -38,13 +39,114 @@ class FormativeAssessmentService:
         classroom_id: int,
         num_questions: int = 5,
     ) -> dict[str, Any]:
-        """Generate an adaptive concept inventory for the classroom.
+        """Generate an adaptive concept inventory across all classroom concepts.
 
         Targets low-mastery concepts and adapts difficulty per concept.
         """
         concepts = self.kg.list_concepts(db, classroom_id)
+        return self._build_assessment(
+            db,
+            student_id=student_id,
+            classroom_id=classroom_id,
+            concepts=concepts,
+            assessment_type="inventory",
+            num_questions=num_questions,
+            empty_message="No concepts in this classroom yet.",
+        )
+
+    # -----------------------------------------------------------------
+    # 2. Pulse check — short mid-lesson check on one lesson's concepts
+    # -----------------------------------------------------------------
+
+    def pulse_check(
+        self,
+        db: Session,
+        *,
+        student_id: int,
+        lesson_id: int,
+        num_questions: int = 3,
+    ) -> dict[str, Any]:
+        """Generate a short pulse check on the concepts covered by a lesson."""
+        lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+        if lesson is None:
+            raise ValueError("Lesson not found")
+
+        concepts = (
+            db.query(Concept)
+            .filter(Concept.classroom_id == lesson.classroom_id, Concept.lesson_id == lesson_id)
+            .all()
+        )
+        return self._build_assessment(
+            db,
+            student_id=student_id,
+            classroom_id=lesson.classroom_id,
+            concepts=concepts,
+            assessment_type="pulse",
+            num_questions=num_questions,
+            lesson_id=lesson_id,
+            empty_message=(
+                "This lesson has no mapped concepts yet. Ask your teacher to build "
+                "the lesson's knowledge graph first."
+            ),
+        )
+
+    # -----------------------------------------------------------------
+    # 3. Prerequisite diagnostic — readiness check before a concept
+    # -----------------------------------------------------------------
+
+    def prerequisite_diagnostic(
+        self,
+        db: Session,
+        *,
+        student_id: int,
+        concept_id: int,
+        num_questions: int = 5,
+    ) -> dict[str, Any]:
+        """Generate a diagnostic over the prerequisite concepts of a target concept."""
+        target = db.query(Concept).filter(Concept.id == concept_id).first()
+        if target is None:
+            raise ValueError("Concept not found")
+
+        prereq_ids = [p.prerequisite_id for p in (target.prerequisites or [])]
+        prereqs = (
+            db.query(Concept).filter(Concept.id.in_(prereq_ids)).all()
+            if prereq_ids
+            else []
+        )
+        result = self._build_assessment(
+            db,
+            student_id=student_id,
+            classroom_id=target.classroom_id,
+            concepts=prereqs,
+            assessment_type="diagnostic",
+            num_questions=num_questions,
+            empty_message=(
+                f'"{target.name}" has no prerequisites defined, so no readiness '
+                "check is needed."
+            ),
+        )
+        result["target_concept"] = {"id": target.id, "name": target.name}
+        return result
+
+    # -----------------------------------------------------------------
+    # Shared generation
+    # -----------------------------------------------------------------
+
+    def _build_assessment(
+        self,
+        db: Session,
+        *,
+        student_id: int,
+        classroom_id: int,
+        concepts: list[Concept],
+        assessment_type: str,
+        num_questions: int,
+        lesson_id: int | None = None,
+        empty_message: str = "No concepts available.",
+    ) -> dict[str, Any]:
+        """Generate adaptive questions for the given concepts and persist the assessment."""
         if not concepts:
-            return {"assessment_id": None, "questions": [], "message": "No concepts in this classroom."}
+            return {"assessment_id": None, "questions": [], "message": empty_message}
 
         concept_ids = [c.id for c in concepts]
         mastery_rows = (
@@ -66,24 +168,20 @@ class FormativeAssessmentService:
             }
             for c in concepts
         ]
-
-        # Sort by mastery ascending so AI prioritises weak concepts
+        # Sort by mastery ascending so the AI prioritises weak concepts
         concepts_with_mastery.sort(key=lambda x: x["mastery"])
 
         questions = self.ai.generate_concept_inventory(
             concepts_with_mastery, num_questions=num_questions
         )
 
-        assessed_ids = list({
-            q.get("concept_id")
-            for q in questions
-            if q.get("concept_id")
-        })
+        assessed_ids = list({q.get("concept_id") for q in questions if q.get("concept_id")})
 
         assessment = FormativeAssessment(
             student_id=student_id,
             classroom_id=classroom_id,
-            assessment_type="inventory",
+            lesson_id=lesson_id,
+            assessment_type=assessment_type,
             questions=questions,
             responses=[],
             max_questions=len(questions),
@@ -96,8 +194,9 @@ class FormativeAssessmentService:
 
         return {
             "assessment_id": assessment.id,
-            "assessment_type": "inventory",
+            "assessment_type": assessment_type,
             "classroom_id": classroom_id,
+            "lesson_id": lesson_id,
             "questions": questions,
             "concept_ids_assessed": assessed_ids,
         }
@@ -234,6 +333,8 @@ class FormativeAssessmentService:
         pct = round(correct / total * 100) if total else 0
         type_label = {
             "inventory": "Concept Inventory",
+            "pulse": "Pulse Check",
+            "diagnostic": "Prerequisite Diagnostic",
         }.get(assessment.assessment_type, "Assessment")
         return f"{type_label}: {correct}/{total} correct ({pct}%)."
 
