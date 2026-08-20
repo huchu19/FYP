@@ -7,11 +7,27 @@ from sqlalchemy.orm import Session
 
 from app.models.lesson_document import LessonDocument
 from app.models.user import User
+from app.repositories.classroom_repository import ClassroomRepository
 from app.repositories.lesson_repository import LessonRepository
 
 logger = logging.getLogger(__name__)
 
 UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+def sanitize_filename(filename: str | None) -> str:
+    """Reduce an uploaded filename to a safe basename.
+
+    Uploaded names are attacker-controlled, so strip any directory
+    component and keep only characters that cannot escape the target
+    directory.
+    """
+    base = os.path.basename(filename or "").strip()
+    cleaned = "".join(c for c in base if c.isalnum() or c in (" ", "-", "_", ".")).strip()
+    cleaned = cleaned.lstrip(".")
+    return cleaned or "upload"
 
 
 class DocumentService:
@@ -94,8 +110,13 @@ class DocumentService:
         lesson_dir = UPLOADS_DIR / "lessons" / str(lesson_id)
         lesson_dir.mkdir(parents=True, exist_ok=True)
 
-        # Read file contents
-        file_bytes = file.file.read()
+        # Read file contents, refusing anything oversized
+        file_bytes = file.file.read(MAX_UPLOAD_BYTES + 1)
+        if len(file_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds the {MAX_UPLOAD_BYTES // (1024 * 1024)}MB upload limit",
+            )
         file.file.seek(0)
 
         # Determine MIME type
@@ -104,15 +125,16 @@ class DocumentService:
         # Extract text
         extracted_text = self.extract_text(file_bytes, mime_type)
 
-        # Save file to disk
-        file_path = lesson_dir / file.filename
+        # Save file to disk under a sanitized name
+        safe_name = sanitize_filename(file.filename)
+        file_path = lesson_dir / safe_name
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
         # Create database record
         doc = LessonDocument(
             lesson_id=lesson_id,
-            filename=file.filename,
+            filename=safe_name,
             file_path=str(file_path),
             mime_type=mime_type,
             extracted_text=extracted_text,
@@ -123,6 +145,28 @@ class DocumentService:
 
         logger.info(f"Uploaded document {file.filename} to lesson {lesson_id}")
         return doc
+
+    def assert_can_read_lesson(self, db: Session, lesson_id: int, *, actor_user: User) -> None:
+        """Allow the owning teacher or a student enrolled in the classroom.
+
+        Existence alone is not authorization: without this check any
+        authenticated user can read any lesson's documents.
+        """
+        lesson = self.lesson_repository.get_by_id(db, lesson_id)
+        if lesson is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lesson not found")
+
+        if lesson.created_by_user_id == actor_user.id:
+            return
+
+        enrollment = ClassroomRepository().get_enrollment(
+            db, classroom_id=lesson.classroom_id, student_id=actor_user.id
+        )
+        if enrollment is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this lesson",
+            )
 
     def list_documents(self, db: Session, lesson_id: int) -> list[LessonDocument]:
         """List all documents for a lesson."""

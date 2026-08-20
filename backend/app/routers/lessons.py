@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
+from app.core.rate_limit import rate_limit_user
 from app.core.security import get_current_user, require_roles
 from app.models.user import User
 from app.services.lesson_service import LessonService
@@ -27,7 +28,12 @@ def list_lessons(
     return service.list_lessons(db)
 
 
-@router.post("/", response_model=Lesson, status_code=201)
+@router.post(
+    "/",
+    response_model=Lesson,
+    status_code=201,
+    dependencies=[Depends(rate_limit_user(limit=20, window_seconds=3600, scope="ai_generate"))],
+)
 def create_lesson(
     payload: LessonCreate,
     generate: bool = True,
@@ -86,7 +92,11 @@ def unpublish_lesson(
     return service.unpublish_lesson(db, lesson_id, actor_user=current_user)
 
 
-@router.post("/{lesson_id}/reformat", response_model=Lesson)
+@router.post(
+    "/{lesson_id}/reformat",
+    response_model=Lesson,
+    dependencies=[Depends(rate_limit_user(limit=20, window_seconds=3600, scope="ai_generate"))],
+)
 def reformat_lesson(
     lesson_id: int,
     payload: LessonReformat,
@@ -98,7 +108,11 @@ def reformat_lesson(
     )
 
 
-@router.post("/{lesson_id}/refine", response_model=Lesson)
+@router.post(
+    "/{lesson_id}/refine",
+    response_model=Lesson,
+    dependencies=[Depends(rate_limit_user(limit=20, window_seconds=3600, scope="ai_generate"))],
+)
 def refine_lesson(
     lesson_id: int,
     payload: LessonRefine,
@@ -127,8 +141,8 @@ def list_documents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[LessonDocument]:
-    # Verify lesson exists
-    service.get_lesson(db, lesson_id)
+    # Verify the caller is allowed to read this lesson
+    doc_service.assert_can_read_lesson(db, lesson_id, actor_user=current_user)
     return doc_service.list_documents(db, lesson_id)
 
 
@@ -141,7 +155,7 @@ def download_document(
 ):
     from app.models.lesson_document import LessonDocument as LessonDocModel
 
-    service.get_lesson(db, lesson_id)
+    doc_service.assert_can_read_lesson(db, lesson_id, actor_user=current_user)
     doc = db.query(LessonDocModel).filter(
         LessonDocModel.id == doc_id,
         LessonDocModel.lesson_id == lesson_id,

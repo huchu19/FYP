@@ -1,4 +1,7 @@
+import base64
 from datetime import datetime
+import hashlib
+import secrets
 from types import SimpleNamespace
 from typing import Optional
 
@@ -467,13 +470,24 @@ def test_teacher_can_delete_classroom_and_all_dependent_content(client, session_
     assert list_response.json() == []
 
 
+def _pbkdf2_hash(password: str) -> str:
+    """Build a pbkdf2 hash the way security.hash_password does without bcrypt."""
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 390000)
+    return (
+        f"pbkdf2_sha256$390000$"
+        f"{base64.urlsafe_b64encode(salt).decode().rstrip('=')}$"
+        f"{base64.urlsafe_b64encode(digest).decode().rstrip('=')}"
+    )
+
+
 def test_legacy_password_login_rehashes_to_bcrypt(client, session_factory):
     create_user(
         session_factory,
         email="legacy@example.com",
         password="ignored",
         role="teacher",
-        password_hash="legacy-password",
+        password_hash=_pbkdf2_hash("legacy-password"),
     )
 
     token = login(client, email="legacy@example.com", password="legacy-password")
@@ -481,8 +495,49 @@ def test_legacy_password_login_rehashes_to_bcrypt(client, session_factory):
     with session_factory() as session:
         user = session.query(User).filter(User.email == "legacy@example.com").one()
         assert token
-        assert user.password_hash != "legacy-password"
         assert user.password_hash.startswith(("$2a$", "$2b$", "$2y$"))
+
+
+def test_repeated_failed_logins_are_rate_limited(client, session_factory):
+    """Brute forcing a password must be throttled, not answered indefinitely."""
+    create_user(
+        session_factory,
+        email="target@example.com",
+        password="CorrectHorse1!",
+        role="teacher",
+    )
+
+    statuses = [
+        client.post(
+            "/auth/login",
+            json={"email": "target@example.com", "password": f"wrong-{i}"},
+        ).status_code
+        for i in range(12)
+    ]
+
+    assert 401 in statuses
+    assert 429 in statuses
+
+
+def test_plaintext_password_hash_is_rejected(client, session_factory):
+    """A stored value that is not a recognised hash must never authenticate.
+
+    Guards the removed fallback that compared the stored hash directly
+    against the submitted password.
+    """
+    create_user(
+        session_factory,
+        email="plaintext@example.com",
+        password="ignored",
+        role="teacher",
+        password_hash="plaintext-password",
+    )
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "plaintext@example.com", "password": "plaintext-password"},
+    )
+    assert response.status_code == 401
 
 
 def test_teacher_lesson_create_route_accepts_authenticated_teacher(client, session_factory, monkeypatch):

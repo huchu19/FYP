@@ -53,9 +53,10 @@ def _b64url_decode(data: str) -> bytes:
 
 
 def _verify_legacy_password(password: str, stored_hash: str) -> bool:
-    # Transitional fallback for very old local records that stored plaintext.
+    # Only the pbkdf2 scheme is recognised. Anything else fails closed —
+    # never compare a stored value against the password directly.
     if not stored_hash.startswith(f"{_LEGACY_PASSWORD_SCHEME}$"):
-        return hmac.compare_digest(stored_hash, password)
+        return False
 
     try:
         scheme, iterations_s, salt_b64, digest_b64 = stored_hash.split("$", 3)
