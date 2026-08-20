@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: edunexus-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Migrations run before the new instance serves traffic, and are kept
+    # out of the web process so concurrent workers cannot race them.
+    preDeployCommand: alembic upgrade head
+    # Generation calls the model provider synchronously; the timeout must
+    # stay above the provider timeout in app/services/ai.py.
+    startCommand: >-
+      gunicorn app.main:app
+      --worker-class uvicorn.workers.UvicornWorker
+      --workers 1
+      --timeout 120
+      --access-logfile -
+      --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.13"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "120"
+      # Generated once by Render; startup refuses the "change-me" default.
+      - key: APP_SECRET_KEY
+        generateValue: true
+      # Set in the dashboard, not here, so credentials stay out of git.
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
