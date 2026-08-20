@@ -216,14 +216,36 @@ Playwright tests cover auth flows, teacher dashboard, student dashboard, and les
 
 Register accounts through the frontend at `/register`, or use the `/auth/register` endpoint directly.
 
-For quick manual testing, the following credentials match the API smoke test documented in `docs/auth_v1_smoke_test.md`:
+Alternatively, run the seed script to create a fully populated demo
+classroom — three published lessons, five linked concepts, a quiz, and
+per-student progress history:
+
+```bash
+cd backend
+../.venv/bin/python scripts/seed.py
+```
 
 | Role | Email | Password |
 |---|---|---|
-| Teacher | `teacher@example.com` | `dev_teacher_hash` |
-| Student | `student@example.com` | `dev_student_hash` |
+| Teacher | `teacher@edunexus.demo` | `Demo1234!` |
+| Student | `priya@edunexus.demo` | `Demo1234!` |
+| Student | `tom@edunexus.demo` | `Demo1234!` |
+| Student | `sofia@edunexus.demo` | `Demo1234!` |
 
-These are not seeded automatically — create them via the `/auth/register` endpoint or the registration UI before using them.
+The seeded classroom joins with code `BIO101`. Seeding makes no AI calls
+and is safe to re-run.
+
+---
+
+## Deployment
+
+The project deploys to free hosting tiers: frontend on Vercel, backend on
+Render, PostgreSQL on Neon, and uploaded files on Cloudflare R2.
+`render.yaml` at the repo root configures the backend service.
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for the full runbook,
+including environment variables, the CORS setup, and an end-to-end
+verification checklist.
 
 ---
 
@@ -235,4 +257,4 @@ These are not seeded automatically — create them via the `/auth/register` endp
 - **Teacher authoring controls** — iterative section-level editing of AI-generated lessons (add/rewrite/remove individual sections) is partially implemented; the UI refinement loop is not complete.
 - **Internationalisation** — language-switching UI is present; only English strings are fully populated. French strings are stubs.
 - **AI analytics** — event ingestion is implemented; automated AI-driven insight summaries over analytics data are scaffolded but not deeply built.
-- **Production deployment** — the project runs locally only. No cloud deployment, containerisation, or production secrets management has been configured.
+- **Scale** — the deployment targets free hosting tiers and runs a single worker. Rate limiting is in-process, so it would need a shared store before scaling out. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

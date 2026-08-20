@@ -26,7 +26,7 @@ Use the project virtualenv (from `backend/`):
 ```
 
 Current expected versions in this project:
-- Python 3.9.x
+- Python 3.11.x (the code uses 3.10+ syntax and will not run on 3.9)
 - Alembic 1.16.x
 
 Create local env file (first time only):
@@ -100,7 +100,7 @@ Run from `backend/`:
 ```
 
 Current expected head:
-- `20260331_0006`
+- `20260420_0012`
 
 Current migration files:
 - `backend/migrations/versions/20260202_0001_initial.py`
@@ -109,6 +109,12 @@ Current migration files:
 - `backend/migrations/versions/20260315_0004_cascade_deletes.py`
 - `backend/migrations/versions/20260324_0005_knowledge_graph.py`
 - `backend/migrations/versions/20260331_0006_student_model_evidence.py`
+- `backend/migrations/versions/20260401_0007_hint_scaffolding_zpd.py`
+- `backend/migrations/versions/20260402_0008_formative_assessments.py`
+- `backend/migrations/versions/20260402_0009_teaching_sessions.py`
+- `backend/migrations/versions/20260405_0010_lesson_documents.py`
+- `backend/migrations/versions/20260413_0011_lesson_prompt_nullable.py`
+- `backend/migrations/versions/20260420_0012_classroom_curriculum_profile.py`
 
 ### 4.1 Create a new migration
 
