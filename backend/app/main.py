@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,6 +9,8 @@ from app.config import settings
 from app.db import SessionLocal
 from app.routers import auth, classrooms, lessons, quizzes, quiz_attempts, gamification, analytics, knowledge_graph, formative_assessments, teaching_sessions
 
+
+logger = logging.getLogger(__name__)
 
 settings.validate_for_production()
 
@@ -35,9 +39,14 @@ app.add_middleware(
 async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
     """Services raise ValueError for client-fixable problems (bad/missing input).
 
-    Translate these to 400 responses instead of leaking a 500.
+    Translate these to 400 responses instead of leaking a 500. The handler
+    is broad, so in production the message is replaced with a generic one:
+    an incidental ValueError from deep in a call stack would otherwise
+    expose internals to the client.
     """
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    logger.warning("ValueError surfaced from %s: %s", request.url.path, exc)
+    detail = "The request could not be processed." if settings.is_production else str(exc)
+    return JSONResponse(status_code=400, content={"detail": detail})
 
 
 @app.get("/")

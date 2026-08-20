@@ -1,7 +1,4 @@
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Response, UploadFile, File
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db
@@ -11,6 +8,7 @@ from app.models.user import User
 from app.services.lesson_service import LessonService
 from app.services.document_service import DocumentService
 from app.services.quiz_service import QuizService
+from app.services.storage import load_document
 from app.schemas.lesson import Lesson, LessonCreate, LessonRefine, LessonReformat, LessonUpdate, LessonDocument
 from app.schemas.quiz import Quiz as QuizSchema
 
@@ -163,14 +161,12 @@ def download_document(
     if doc is None:
         return Response(content="Document not found", status_code=404)
 
-    file_path = Path(doc.file_path)
-    if not file_path.exists():
-        return Response(content="File not found on disk", status_code=404)
+    content = load_document(doc.file_path)
 
-    return FileResponse(
-        path=str(file_path),
-        filename=doc.filename,
+    return Response(
+        content=content,
         media_type=doc.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'},
     )
 
 

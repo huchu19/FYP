@@ -9,10 +9,9 @@ from app.models.lesson_document import LessonDocument
 from app.models.user import User
 from app.repositories.classroom_repository import ClassroomRepository
 from app.repositories.lesson_repository import LessonRepository
+from app.services.storage import UPLOADS_DIR, store_document
 
 logger = logging.getLogger(__name__)
-
-UPLOADS_DIR = Path(__file__).resolve().parent.parent.parent / "uploads"
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
@@ -106,10 +105,6 @@ class DocumentService:
                 detail="Only the lesson creator can upload documents",
             )
 
-        # Create lesson uploads directory
-        lesson_dir = UPLOADS_DIR / "lessons" / str(lesson_id)
-        lesson_dir.mkdir(parents=True, exist_ok=True)
-
         # Read file contents, refusing anything oversized
         file_bytes = file.file.read(MAX_UPLOAD_BYTES + 1)
         if len(file_bytes) > MAX_UPLOAD_BYTES:
@@ -125,17 +120,20 @@ class DocumentService:
         # Extract text
         extracted_text = self.extract_text(file_bytes, mime_type)
 
-        # Save file to disk under a sanitized name
+        # Persist under a sanitized name via the configured storage backend
         safe_name = sanitize_filename(file.filename)
-        file_path = lesson_dir / safe_name
-        with open(file_path, "wb") as f:
-            f.write(file_bytes)
+        reference = store_document(
+            lesson_id=lesson_id,
+            filename=safe_name,
+            data=file_bytes,
+            content_type=mime_type,
+        )
 
         # Create database record
         doc = LessonDocument(
             lesson_id=lesson_id,
             filename=safe_name,
-            file_path=str(file_path),
+            file_path=reference,
             mime_type=mime_type,
             extracted_text=extracted_text,
         )

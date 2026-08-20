@@ -12,6 +12,8 @@ import logging
 import re
 from typing import Any
 
+from fastapi import HTTPException, status
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -339,6 +341,10 @@ def _use_gemini() -> bool:
     return bool(settings.gemini_api_key)
 
 
+# A hung provider call would otherwise occupy the worker indefinitely.
+_REQUEST_TIMEOUT_SECONDS = 90
+
+
 def _call_gemini(system_prompt: str, user_prompt: str) -> str:
     import google.generativeai as genai
 
@@ -351,14 +357,17 @@ def _call_gemini(system_prompt: str, user_prompt: str) -> str:
             temperature=0.5,
         ),
     )
-    response = model.generate_content(user_prompt)
+    response = model.generate_content(
+        user_prompt,
+        request_options={"timeout": _REQUEST_TIMEOUT_SECONDS},
+    )
     return response.text
 
 
 def _call_openai(system_prompt: str, user_prompt: str) -> str:
     from openai import OpenAI
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = OpenAI(api_key=settings.openai_api_key, timeout=_REQUEST_TIMEOUT_SECONDS)
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -375,9 +384,31 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str:
 def _call_model(system_prompt: str, user_prompt: str) -> str:
     if _use_gemini():
         logger.info("Using Gemini for AI generation")
-        return _call_gemini(system_prompt, user_prompt)
-    logger.info("Using OpenAI for AI generation")
-    return _call_openai(system_prompt, user_prompt)
+        provider = _call_gemini
+    elif settings.openai_api_key:
+        logger.info("Using OpenAI for AI generation")
+        provider = _call_openai
+    else:
+        # Without this the OpenAI client raises on an empty key and the
+        # request surfaces as an opaque 500.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "AI generation is not configured on this server. "
+                "Set GEMINI_API_KEY or OPENAI_API_KEY to enable it."
+            ),
+        )
+
+    try:
+        return provider(system_prompt, user_prompt)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 - provider errors must not leak
+        logger.exception("AI provider call failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The AI service is temporarily unavailable. Please try again.",
+        ) from exc
 
 
 def _call_model_with_retry(
