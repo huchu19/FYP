@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -14,7 +14,7 @@ import {
   BrainIcon,
 } from "@/components/layout/icons";
 
-export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
+function StudentKnowledgeGraphView({ params: paramsPromise }) {
   const params = use(paramsPromise);
   const classroomId = params.id;
   const router = useRouter();
@@ -364,5 +364,15 @@ export default function StudentKnowledgeGraphPage({ params: paramsPromise }) {
         <FormativeRunner assessment={diagAssessment} onClose={() => setDiagAssessment(null)} />
       )}
     </section>
+  );
+}
+
+// useSearchParams needs a Suspense boundary above it; without one this
+// route breaks the build the moment it is prerendered.
+export default function StudentKnowledgeGraphPage({ params }) {
+  return (
+    <Suspense fallback={null}>
+      <StudentKnowledgeGraphView params={params} />
+    </Suspense>
   );
 }

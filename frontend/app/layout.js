@@ -2,6 +2,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import AppFrame from "@/components/layout/AppFrame";
+import WakingNotice from "@/components/layout/WakingNotice";
 
 export const metadata = {
   title: "EduNexus",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <AuthProvider>
             <AppFrame>{children}</AppFrame>
+            <WakingNotice />
           </AuthProvider>
         </ThemeProvider>
       </body>
