@@ -25,15 +25,15 @@ export default function Navbar() {
   }
 
   const marketingLinks = [
-    { href: "/#features", label: "Features" },
     { href: "/#how-it-works", label: "How It Works" },
     { href: "/#teachers", label: "For Teachers" },
     { href: "/#students", label: "For Students" },
+    { href: "/#try-it", label: "Before You Try It" },
   ];
   const dashboardHref = user?.role === "teacher" ? "/teacher" : "/student";
 
   return (
-    <header className="sticky top-4 z-50 rounded-[1.8rem] border border-[var(--border-card)] bg-[var(--bg-shell)] shadow-[var(--shadow-shell)] backdrop-blur-md">
+    <header className="relative z-50 rounded-[1.8rem] lg:sticky lg:top-4 border border-[var(--border-card)] bg-[var(--bg-shell)] shadow-[var(--shadow-shell)] backdrop-blur-md">
       <div className="flex flex-col gap-4 px-5 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-3">
@@ -57,7 +57,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 className={`${navLink} ${
-                  pathname === "/" && link.href === "/#features"
+                  pathname === "/" && link.href === "/#how-it-works"
                     ? "text-[var(--text-heading)]"
                     : ""
                 }`}
