@@ -6,9 +6,9 @@ services:
     region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    # Migrations run before the new instance serves traffic, and are kept
-    # out of the web process so concurrent workers cannot race them.
-    preDeployCommand: alembic upgrade head
+    # Migrations are run manually (see backend/README.md); Render's free tier
+    # does not support preDeployCommand. On a paid plan, add
+    # `preDeployCommand: alembic upgrade head` here.
     # Generation calls the model provider synchronously; the timeout must
     # stay above the provider timeout in app/services/ai.py.
     startCommand: >-
